@@ -35,9 +35,7 @@ const nextConfig = {
       },
     ],
   },
-  experimental: {
-    allowedDevOrigins: true,
-  },
+  allowedDevOrigins: ['*.replit.dev'],
   serverExternalPackages: ['xlsx'],
 };
 
