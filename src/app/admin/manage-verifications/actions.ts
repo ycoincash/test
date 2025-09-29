@@ -2,12 +2,13 @@
 'use server';
 
 import { db } from '@/lib/firebase/config';
+import { verifyAdminToken } from '@/lib/auth-helpers';
 import { collection, getDocs, doc, updateDoc, Timestamp, runTransaction, query, where } from 'firebase/firestore';
 import type { UserProfile, PendingVerification, KycData, AddressData } from '@/types';
 import { createNotification } from '../actions';
 
 async function verifyAdmin() {
-    // This is a placeholder for a real admin verification check.
+    await verifyAdminToken();
     return true;
 }
 

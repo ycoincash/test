@@ -8,13 +8,15 @@ import { startOfMonth } from 'date-fns';
 import type { ActivityLog, BannerSettings, BlogPost, Broker, CashbackTransaction, DeviceInfo, Notification, Order, PaymentMethod, ProductCategory, Product, TradingAccount, UserProfile, Withdrawal, GeoInfo, ClientLevel, AdminNotification, Offer } from '@/types';
 import { headers } from 'next/headers';
 import { getClientLevels } from '@/app/actions';
+import { verifyAdminToken } from '@/lib/auth-helpers';
 
 // ====================================================================
 // SECURITY: Helper to verify admin role from the server-side.
 // ====================================================================
 async function verifyAdmin() {
-    // This is a placeholder for a real admin verification check.
-    // In a real app, you would verify a Firebase ID token passed in the headers.
+    // Verify Firebase ID token and check admin claim
+    // This will throw an error if the token is invalid or user is not an admin
+    await verifyAdminToken();
     return true;
 }
 

@@ -5,9 +5,12 @@
 import { db } from '@/lib/firebase/config';
 import { collection, doc, getDocs, updateDoc, addDoc, serverTimestamp, query, where, Timestamp, writeBatch, deleteDoc, getDoc, runTransaction, increment, orderBy } from 'firebase/firestore';
 import type { FeedbackForm, FeedbackResponse, EnrichedFeedbackResponse, UserProfile } from '@/types';
+import { verifyAdminToken } from '@/lib/auth-helpers';
 
 async function verifyAdmin() {
-    // This is a placeholder for a real admin verification check.
+    await verifyAdminToken();
+    return true;
+}
     return true;
 }
 

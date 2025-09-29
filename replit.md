@@ -71,9 +71,34 @@ The following Firebase configuration variables must be set in Replit Secrets:
 - The `allowedDevOrigins` config allows Replit proxy domains for proper development experience
 - TypeScript and ESLint errors are ignored during builds (configured in next.config.js)
 
+## Security Implementation
+
+### Firebase Security
+- **Firestore Rules**: Comprehensive security rules implemented in `firestore.rules`
+  - User-owned collections with proper ownership checks
+  - Admin-only collections requiring `admin: true` custom claim
+  - Public read-only collections for products, brokers, etc.
+- **Admin Authentication**: Token verification system in `src/lib/auth-helpers.ts`
+- **Admin Role**: Script available at `scripts/set-admin-role.ts` to grant admin privileges
+
+### Security Documentation
+- `SECURITY_MAPPING.md`: Complete action-to-security mapping
+- `SECURITY_IMPLEMENTATION_STATUS.md`: Implementation status and remaining work
+
+### Admin User
+- **UID**: `6yUTvF9JrBQo3GUEqxhUnfleVOE3`
+- **Email**: `alsabhibassem@gmail.com`
+- **Setup**: Run `npx tsx scripts/set-admin-role.ts` to activate admin privileges
+
 ## Recent Changes
 - 2025-09-29: Initial Replit environment setup
   - Configured port 5000 with 0.0.0.0 binding
   - Updated Next.js config for Replit proxy compatibility
   - Set up deployment configuration
   - Installed all npm dependencies
+- 2025-09-29: Firebase security implementation
+  - Created comprehensive Firestore security rules
+  - Implemented authentication helpers and token verification
+  - Set up admin role management system
+  - Installed firebase-admin and tsx packages
+  - **Note**: Admin actions need to be migrated from Web SDK to Admin SDK (see SECURITY_IMPLEMENTATION_STATUS.md)

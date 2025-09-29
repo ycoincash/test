@@ -7,7 +7,7 @@ import { calculateCashback } from "@/ai/flows/calculate-cashback";
 import type { CalculateCashbackInput, CalculateCashbackOutput } from "@/ai/flows/calculate-cashback";
 import { auth, db } from "@/lib/firebase/config";
 import { createUserWithEmailAndPassword, signOut, sendPasswordResetEmail, deleteUser } from "firebase/auth";
-import { doc, setDoc, Timestamp, getDocs, collection, query, where, runTransaction, arrayUnion, writeBatch, increment, getDoc, updateDoc } from "firebase/firestore";
+import { doc, setDoc, Timestamp, getDocs, collection, query, where, runTransaction, arrayUnion, writeBatch, increment, getDoc, updateDoc, addDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
 import { generateReferralCode } from "@/lib/referral";
 import { logUserActivity } from "./admin/actions";
 import { getClientSessionInfo } from "@/lib/device-info";

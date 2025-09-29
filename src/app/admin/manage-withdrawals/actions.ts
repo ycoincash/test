@@ -5,10 +5,11 @@ import { db } from '@/lib/firebase/config';
 import { collection, doc, getDocs, updateDoc, serverTimestamp, query, orderBy, runTransaction, Timestamp } from 'firebase/firestore';
 import type { Withdrawal } from '@/types';
 import { createNotification } from '../actions';
+import { verifyAdminToken } from '@/lib/auth-helpers';
 
 
 async function verifyAdmin() {
-    // This is a placeholder for a real admin verification check.
+    await verifyAdminToken();
     return true;
 }
 

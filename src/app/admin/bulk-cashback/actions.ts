@@ -4,10 +4,13 @@
 import { db } from '@/lib/firebase/config';
 import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import type { TradingAccount } from '@/types';
+import { verifyAdminToken } from '@/lib/auth-helpers';
 import { addCashbackTransaction } from '../manage-cashback/actions';
 
 async function verifyAdmin() {
-  return true;
+    await verifyAdminToken();
+    return true;
+}
 }
 
 const safeToDate = (timestamp: any): Date | undefined => {

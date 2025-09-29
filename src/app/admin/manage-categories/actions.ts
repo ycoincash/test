@@ -4,9 +4,12 @@
 import { db } from '@/lib/firebase/config';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, query, orderBy, doc } from 'firebase/firestore';
 import type { ProductCategory } from '@/types';
+import { verifyAdminToken } from '@/lib/auth-helpers';
 
 async function verifyAdmin() {
-    // This is a placeholder for a real admin verification check.
+    await verifyAdminToken();
+    return true;
+}
     return true;
 }
 

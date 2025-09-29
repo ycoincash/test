@@ -3,9 +3,12 @@
 import { db } from '@/lib/firebase/config';
 import { collection, doc, getDocs, updateDoc, addDoc, query, orderBy, writeBatch, deleteDoc } from 'firebase/firestore';
 import type { Broker } from '@/types';
+import { verifyAdminToken } from '@/lib/auth-helpers';
 
 async function verifyAdmin() {
-    // Placeholder for real admin verification
+    await verifyAdminToken();
+    return true;
+}
     return true;
 }
 

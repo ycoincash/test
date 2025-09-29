@@ -3,13 +3,14 @@
 'use server';
 
 import { db } from '@/lib/firebase/config';
+import { verifyAdminToken } from '@/lib/auth-helpers';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, query, orderBy, doc, where } from 'firebase/firestore';
 import type { Offer, UserProfile } from '@/types';
 import { getClientSessionInfo } from '@/lib/device-info';
 import { getAuth } from 'firebase/auth';
 
 async function verifyAdmin() {
-    // Placeholder
+    await verifyAdminToken();
     return true;
 }
 
