@@ -3,12 +3,7 @@
 import { db } from '@/lib/firebase/config';
 import { collection, doc, getDocs, updateDoc, addDoc, query, orderBy, writeBatch, deleteDoc } from 'firebase/firestore';
 import type { Broker } from '@/types';
-import { verifyAdminToken } from '@/lib/auth-helpers';
 
-async function verifyAdmin() {
-    await verifyAdminToken();
-    return true;
-}
     return true;
 }
 
@@ -18,7 +13,6 @@ export async function getBrokers(): Promise<Broker[]> {
 }
 
 export async function addBroker(data: Omit<Broker, 'id' | 'order'>) {
-    await verifyAdmin();
     try {
         const brokersSnapshot = await getDocs(query(collection(db, 'brokers'), orderBy('order', 'desc')));
         const maxOrder = brokersSnapshot.docs.length > 0 && brokersSnapshot.docs[0].data().order != null ? brokersSnapshot.docs[0].data().order : -1;
@@ -31,7 +25,6 @@ export async function addBroker(data: Omit<Broker, 'id' | 'order'>) {
 }
 
 export async function updateBroker(brokerId: string, data: Partial<Omit<Broker, 'id'>>) {
-    await verifyAdmin();
     try {
         const brokerRef = doc(db, 'brokers', brokerId);
         await updateDoc(brokerRef, data);
@@ -43,7 +36,6 @@ export async function updateBroker(brokerId: string, data: Partial<Omit<Broker, 
 }
 
 export async function deleteBroker(brokerId: string) {
-    await verifyAdmin();
     try {
         await deleteDoc(doc(db, 'brokers', brokerId));
         return { success: true, message: 'تم حذف الوسيط بنجاح.' };
@@ -54,7 +46,6 @@ export async function deleteBroker(brokerId: string) {
 }
 
 export async function updateBrokerOrder(orderedIds: string[]) {
-    await verifyAdmin();
     try {
         const batch = writeBatch(db);
         orderedIds.forEach((id, index) => {
@@ -70,7 +61,6 @@ export async function updateBrokerOrder(orderedIds: string[]) {
 }
 
 export async function addBrokersBatch(brokers: Omit<Broker, 'id' | 'order'>[]) {
-    await verifyAdmin();
     try {
         const batch = writeBatch(db);
         const brokersCollection = collection(db, 'brokers');

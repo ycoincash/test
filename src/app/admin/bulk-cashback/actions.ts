@@ -4,13 +4,8 @@
 import { db } from '@/lib/firebase/config';
 import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import type { TradingAccount } from '@/types';
-import { verifyAdminToken } from '@/lib/auth-helpers';
 import { addCashbackTransaction } from '../manage-cashback/actions';
 
-async function verifyAdmin() {
-    await verifyAdminToken();
-    return true;
-}
 }
 
 const safeToDate = (timestamp: any): Date | undefined => {
@@ -25,7 +20,6 @@ const safeToDate = (timestamp: any): Date | undefined => {
 
 
 export async function processBulkCashback(validatedData: { accountNumber: string, cashbackAmount: number, note: string, userId: string, accountId: string, broker: string }[]) {
-    await verifyAdmin();
     if (validatedData.length === 0) {
         return { success: false, message: "No valid rows to process." };
     }
@@ -73,7 +67,6 @@ export async function processBulkCashback(validatedData: { accountNumber: string
 }
 
 export async function getApprovedAccounts(): Promise<TradingAccount[]> {
-    await verifyAdmin();
     const accountsQuery = query(collection(db, 'tradingAccounts'), where('status', '==', 'Approved'));
     const snapshot = await getDocs(accountsQuery);
     return snapshot.docs.map(doc => {

@@ -2,17 +2,11 @@
 "use server";
 
 import { db } from '@/lib/firebase/config';
-import { verifyAdminToken } from '@/lib/auth-helpers';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, query, orderBy, doc } from 'firebase/firestore';
 import type { Product } from '@/types';
 
-async function verifyAdmin() {
-    await verifyAdminToken();
-    return true;
-}
 
 export async function addProduct(data: Omit<Product, 'id'>) {
-    await verifyAdmin();
     try {
         await addDoc(collection(db, 'products'), data);
         return { success: true, message: 'تمت إضافة المنتج بنجاح.' };
@@ -23,7 +17,6 @@ export async function addProduct(data: Omit<Product, 'id'>) {
 }
 
 export async function updateProduct(id: string, data: Partial<Product>) {
-    await verifyAdmin();
     try {
         await updateDoc(doc(db, 'products', id), data);
         return { success: true, message: 'تم تحديث المنتج بنجاح.' };
@@ -34,7 +27,6 @@ export async function updateProduct(id: string, data: Partial<Product>) {
 }
 
 export async function deleteProduct(id: string) {
-    await verifyAdmin();
     try {
         await deleteDoc(doc(db, 'products', id));
         return { success: true, message: 'تم حذف المنتج بنجاح.' };

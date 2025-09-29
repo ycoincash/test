@@ -5,12 +5,7 @@ import { db } from '@/lib/firebase/config';
 import { collection, doc, getDocs, updateDoc, addDoc, serverTimestamp, query, where, Timestamp, runTransaction } from 'firebase/firestore';
 import type { TradingAccount, UserProfile } from '@/types';
 import { createNotification } from '../actions';
-import { verifyAdminToken } from '@/lib/auth-helpers';
 
-async function verifyAdmin() {
-    await verifyAdminToken();
-    return true;
-}
 
 const safeToDate = (timestamp: any): Date | undefined => {
     if (timestamp instanceof Timestamp) {
@@ -23,7 +18,6 @@ const safeToDate = (timestamp: any): Date | undefined => {
 };
 
 export async function getTradingAccounts(): Promise<TradingAccount[]> {
-  await verifyAdmin();
   const accountsSnapshot = await getDocs(collection(db, 'tradingAccounts'));
   const accounts: TradingAccount[] = [];
   accountsSnapshot.docs.forEach(doc => {
@@ -42,7 +36,6 @@ export async function getTradingAccounts(): Promise<TradingAccount[]> {
 }
 
 export async function updateTradingAccountStatus(accountId: string, status: 'Approved' | 'Rejected', reason?: string) {
-    await verifyAdmin();
     return runTransaction(db, async (transaction) => {
         const accountRef = doc(db, 'tradingAccounts', accountId);
         const accountSnap = await transaction.get(accountRef);
@@ -82,7 +75,6 @@ export async function updateTradingAccountStatus(accountId: string, status: 'App
 }
 
 export async function adminAddTradingAccount(userId: string, brokerName: string, accountNumber: string) {
-    await verifyAdmin();
     return runTransaction(db, async (transaction) => {
         const q = query(
             collection(db, 'tradingAccounts'),

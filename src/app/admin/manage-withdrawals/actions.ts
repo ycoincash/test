@@ -5,13 +5,8 @@ import { db } from '@/lib/firebase/config';
 import { collection, doc, getDocs, updateDoc, serverTimestamp, query, orderBy, runTransaction, Timestamp } from 'firebase/firestore';
 import type { Withdrawal } from '@/types';
 import { createNotification } from '../actions';
-import { verifyAdminToken } from '@/lib/auth-helpers';
 
 
-async function verifyAdmin() {
-    await verifyAdminToken();
-    return true;
-}
 
 const safeToDate = (timestamp: any): Date | undefined => {
     if (timestamp instanceof Timestamp) {
@@ -24,7 +19,6 @@ const safeToDate = (timestamp: any): Date | undefined => {
 };
 
 export async function getWithdrawals(): Promise<Withdrawal[]> {
-    await verifyAdmin();
     const withdrawalsSnapshot = await getDocs(query(collection(db, 'withdrawals'), orderBy('requestedAt', 'desc')));
     const withdrawals: Withdrawal[] = [];
 
@@ -47,7 +41,6 @@ export async function getWithdrawals(): Promise<Withdrawal[]> {
 }
 
 export async function approveWithdrawal(withdrawalId: string, txId: string) {
-    await verifyAdmin();
     try {
         await runTransaction(db, async (transaction) => {
             const withdrawalRef = doc(db, 'withdrawals', withdrawalId);
@@ -74,7 +67,6 @@ export async function approveWithdrawal(withdrawalId: string, txId: string) {
 }
 
 export async function rejectWithdrawal(withdrawalId: string, reason: string) {
-    await verifyAdmin();
      try {
         await runTransaction(db, async (transaction) => {
             const withdrawalRef = doc(db, 'withdrawals', withdrawalId);

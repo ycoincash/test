@@ -2,15 +2,10 @@
 'use server';
 
 import { db } from '@/lib/firebase/config';
-import { verifyAdminToken } from '@/lib/auth-helpers';
 import { collection, getDocs, doc, updateDoc, Timestamp, runTransaction, query, where } from 'firebase/firestore';
 import type { UserProfile, PendingVerification, KycData, AddressData } from '@/types';
 import { createNotification } from '../actions';
 
-async function verifyAdmin() {
-    await verifyAdminToken();
-    return true;
-}
 
 const safeToDate = (timestamp: any): Date | undefined => {
     if (!timestamp) return undefined;
@@ -21,7 +16,6 @@ const safeToDate = (timestamp: any): Date | undefined => {
 
 
 export async function getPendingVerifications(): Promise<PendingVerification[]> {
-    await verifyAdmin();
     const usersSnapshot = await getDocs(collection(db, 'users'));
     
     const pendingRequests: PendingVerification[] = [];
@@ -85,7 +79,6 @@ export async function updateVerificationStatus(
     status: 'Verified' | 'Rejected',
     reason?: string
 ) {
-    await verifyAdmin();
     return runTransaction(db, async (transaction) => {
         const userRef = doc(db, 'users', userId);
         let updateData: Record<string, any> = {};

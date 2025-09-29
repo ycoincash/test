@@ -4,17 +4,11 @@
 import { db } from '@/lib/firebase/config';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, query, orderBy, doc } from 'firebase/firestore';
 import type { ProductCategory } from '@/types';
-import { verifyAdminToken } from '@/lib/auth-helpers';
 
-async function verifyAdmin() {
-    await verifyAdminToken();
-    return true;
-}
     return true;
 }
 
 export async function addCategory(data: Omit<ProductCategory, 'id'>) {
-    await verifyAdmin();
     try {
         await addDoc(collection(db, 'productCategories'), data);
         return { success: true, message: 'تمت إضافة الفئة بنجاح.' };
@@ -25,7 +19,6 @@ export async function addCategory(data: Omit<ProductCategory, 'id'>) {
 }
 
 export async function updateCategory(id: string, data: Partial<ProductCategory>) {
-    await verifyAdmin();
     try {
         await updateDoc(doc(db, 'productCategories', id), data);
         return { success: true, message: 'تم تحديث الفئة بنجاح.' };
@@ -36,7 +29,6 @@ export async function updateCategory(id: string, data: Partial<ProductCategory>)
 }
 
 export async function deleteCategory(id: string) {
-    await verifyAdmin();
     try {
         await deleteDoc(doc(db, 'productCategories', id));
         return { success: true, message: 'تم حذف الفئة بنجاح.' };

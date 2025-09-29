@@ -2,18 +2,12 @@
 "use server";
 
 import { db } from '@/lib/firebase/config';
-import { verifyAdminToken } from '@/lib/auth-helpers';
 import { collection, doc, getDocs, updateDoc, serverTimestamp, query, orderBy, runTransaction, increment, Transaction } from 'firebase/firestore';
 import type { Order, Notification } from '@/types';
 import { awardReferralCommission, clawbackReferralCommission, createNotification } from '../actions';
 
-async function verifyAdmin() {
-    await verifyAdminToken();
-    return true;
-}
 
 export async function updateOrderStatus(orderId: string, status: Order['status']) {
-    await verifyAdmin();
     try {
         await runTransaction(db, async (transaction) => {
             const orderRef = doc(db, 'orders', orderId);

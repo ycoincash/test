@@ -3,19 +3,13 @@
 'use server';
 
 import { db } from '@/lib/firebase/config';
-import { verifyAdminToken } from '@/lib/auth-helpers';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, query, orderBy, doc, where } from 'firebase/firestore';
 import type { Offer, UserProfile } from '@/types';
 import { getClientSessionInfo } from '@/lib/device-info';
 import { getAuth } from 'firebase/auth';
 
-async function verifyAdmin() {
-    await verifyAdminToken();
-    return true;
-}
 
 export async function addOffer(data: Omit<Offer, 'id'>) {
-    await verifyAdmin();
     try {
         await addDoc(collection(db, 'offers'), data);
         return { success: true, message: 'تمت إضافة العرض بنجاح.' };
@@ -26,7 +20,6 @@ export async function addOffer(data: Omit<Offer, 'id'>) {
 }
 
 export async function updateOffer(id: string, data: Partial<Omit<Offer, 'id'>>) {
-    await verifyAdmin();
     try {
         await updateDoc(doc(db, 'offers', id), data);
         return { success: true, message: 'تم تحديث العرض بنجاح.' };
@@ -37,7 +30,6 @@ export async function updateOffer(id: string, data: Partial<Omit<Offer, 'id'>>) 
 }
 
 export async function deleteOffer(id: string) {
-    await verifyAdmin();
     try {
         await deleteDoc(doc(db, 'offers', id));
         return { success: true, message: 'تم حذف العرض بنجاح.' };

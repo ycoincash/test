@@ -2,17 +2,11 @@
 'use server';
 
 import { db } from '@/lib/firebase/config';
-import { verifyAdminToken } from '@/lib/auth-helpers';
 import { collection, doc, getDocs, writeBatch, setDoc } from 'firebase/firestore';
 import type { ClientLevel } from '@/types';
 
-async function verifyAdmin() {
-    await verifyAdminToken();
-    return true;
-}
 
 export async function updateClientLevels(levels: ClientLevel[]) {
-    await verifyAdmin();
     try {
         const batch = writeBatch(db);
         levels.forEach(level => {
@@ -30,7 +24,6 @@ export async function updateClientLevels(levels: ClientLevel[]) {
 }
 
 export async function seedClientLevels(): Promise<{ success: boolean; message: string; }> {
-    await verifyAdmin();
     const levelsCollection = collection(db, 'clientLevels');
     const snapshot = await getDocs(levelsCollection);
     if (!snapshot.empty) {

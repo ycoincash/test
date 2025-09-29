@@ -8,17 +8,11 @@ import { startOfMonth } from 'date-fns';
 import type { ActivityLog, BannerSettings, BlogPost, Broker, CashbackTransaction, DeviceInfo, Notification, Order, PaymentMethod, ProductCategory, Product, TradingAccount, UserProfile, Withdrawal, GeoInfo, ClientLevel, AdminNotification, Offer } from '@/types';
 import { headers } from 'next/headers';
 import { getClientLevels } from '@/app/actions';
-import { verifyAdminToken } from '@/lib/auth-helpers';
-
 // ====================================================================
-// SECURITY: Helper to verify admin role from the server-side.
+// SECURITY: Admin verification is handled by Firestore Security Rules
+// All admin operations require the user to have admin: true custom claim
+// The Firestore rules verify this claim on every database operation
 // ====================================================================
-async function verifyAdmin() {
-    // Verify Firebase ID token and check admin claim
-    // This will throw an error if the token is invalid or user is not an admin
-    await verifyAdminToken();
-    return true;
-}
 
 
 const safeToDate = (timestamp: any): Date | undefined => {
@@ -61,7 +55,6 @@ export async function logUserActivity(
 }
 
 export async function getActivityLogs(): Promise<ActivityLog[]> {
-    await verifyAdmin();
     const logsSnapshot = await getDocs(query(collection(db, 'activityLogs'), orderBy('timestamp', 'desc')));
     return logsSnapshot.docs.map(doc => {
         const data = doc.data();

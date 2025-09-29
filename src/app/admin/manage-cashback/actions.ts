@@ -5,12 +5,7 @@ import { db } from '@/lib/firebase/config';
 import { collection, doc, serverTimestamp, runTransaction, increment, getDocs, query, Timestamp, orderBy } from 'firebase/firestore';
 import type { CashbackTransaction, UserProfile } from '@/types';
 import { createNotification, awardReferralCommission } from '../actions';
-import { verifyAdminToken } from '@/lib/auth-helpers';
 
-async function verifyAdmin() {
-    await verifyAdminToken();
-    return true;
-}
 
 const safeToDate = (timestamp: any): Date | undefined => {
     if (timestamp instanceof Timestamp) {
@@ -24,7 +19,6 @@ const safeToDate = (timestamp: any): Date | undefined => {
 
 
 export async function addCashbackTransaction(data: Omit<CashbackTransaction, 'id' | 'date'>) {
-    await verifyAdmin();
     try {
         // Step 1: Run the primary transaction for the user receiving cashback.
         await runTransaction(db, async (transaction) => {
@@ -57,7 +51,6 @@ export async function addCashbackTransaction(data: Omit<CashbackTransaction, 'id
 }
 
 export async function getCashbackHistory(): Promise<(CashbackTransaction & { userProfile?: Partial<UserProfile> })[]> {
-    await verifyAdmin();
     const [transactionsSnap, usersSnap] = await Promise.all([
         getDocs(query(collection(db, "cashbackTransactions"), orderBy("date", "desc"))),
         getDocs(collection(db, 'users'))

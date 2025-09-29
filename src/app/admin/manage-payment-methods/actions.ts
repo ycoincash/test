@@ -2,15 +2,10 @@
 "use server";
 
 import { db } from '@/lib/firebase/config';
-import { verifyAdminToken } from '@/lib/auth-helpers';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, query, orderBy, doc } from 'firebase/firestore';
 import type { PaymentMethod } from '@/types';
 
 
-async function verifyAdmin() {
-    await verifyAdminToken();
-    return true;
-}
 
 export async function getPaymentMethods(): Promise<PaymentMethod[]> {
     const snapshot = await getDocs(query(collection(db, 'paymentMethods'), orderBy('name')));
@@ -18,7 +13,6 @@ export async function getPaymentMethods(): Promise<PaymentMethod[]> {
 }
 
 export async function addPaymentMethod(data: Omit<PaymentMethod, 'id'>) {
-    await verifyAdmin();
     try {
         await addDoc(collection(db, 'paymentMethods'), data);
         return { success: true, message: 'تمت إضافة طريقة الدفع بنجاح.' };
@@ -29,7 +23,6 @@ export async function addPaymentMethod(data: Omit<PaymentMethod, 'id'>) {
 }
 
 export async function updatePaymentMethod(id: string, data: Partial<PaymentMethod>) {
-    await verifyAdmin();
     try {
         await updateDoc(doc(db, 'paymentMethods', id), data);
         return { success: true, message: 'تم تحديث طريقة الدفع بنجاح.' };
@@ -40,7 +33,6 @@ export async function updatePaymentMethod(id: string, data: Partial<PaymentMetho
 }
 
 export async function deletePaymentMethod(id: string) {
-    await verifyAdmin();
     try {
         await deleteDoc(doc(db, 'paymentMethods', id));
         return { success: true, message: 'تم حذف طريقة الدفع بنجاح.' };

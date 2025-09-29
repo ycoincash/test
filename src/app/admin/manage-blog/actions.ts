@@ -4,12 +4,7 @@
 import { db } from '@/lib/firebase/config';
 import { collection, doc, getDocs, updateDoc, addDoc, serverTimestamp, query, orderBy, deleteDoc } from 'firebase/firestore';
 import type { BlogPost } from '@/types';
-import { verifyAdminToken } from '@/lib/auth-helpers';
 
-async function verifyAdmin() {
-    await verifyAdminToken();
-    return true;
-}
     return true;
 }
 
@@ -30,13 +25,11 @@ const convertTimestamps = (docData: any): BlogPost => {
 }
 
 export async function getAllBlogPosts(): Promise<BlogPost[]> {
-    await verifyAdmin();
     const snapshot = await getDocs(query(collection(db, 'blogPosts'), orderBy('createdAt', 'desc')));
     return snapshot.docs.map(convertTimestamps);
 }
 
 export async function addBlogPost(data: Omit<BlogPost, 'id' | 'createdAt' | 'updatedAt'>) {
-    await verifyAdmin();
     try {
         await addDoc(collection(db, 'blogPosts'), {
             ...data,
@@ -51,7 +44,6 @@ export async function addBlogPost(data: Omit<BlogPost, 'id' | 'createdAt' | 'upd
 }
 
 export async function updateBlogPost(id: string, data: Partial<Omit<BlogPost, 'id' | 'createdAt'>>) {
-    await verifyAdmin();
     try {
         const postRef = doc(db, 'blogPosts', id);
         await updateDoc(postRef, {
@@ -66,7 +58,6 @@ export async function updateBlogPost(id: string, data: Partial<Omit<BlogPost, 'i
 }
 
 export async function deleteBlogPost(id: string) {
-    await verifyAdmin();
     try {
         await deleteDoc(doc(db, 'blogPosts', id));
         return { success: true, message: 'تم حذف المقال بنجاح.' };

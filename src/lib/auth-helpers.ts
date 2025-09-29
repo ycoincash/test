@@ -4,6 +4,7 @@ import { adminAuth } from './firebase/admin-config';
 /**
  * Verifies the Firebase ID token from the Authorization header
  * Returns the decoded token if valid, throws error if invalid
+ * NOTE: This only works with API routes, not Server Actions
  */
 export async function verifyAuthToken() {
   const headersList = await headers();
@@ -25,7 +26,32 @@ export async function verifyAuthToken() {
 }
 
 /**
- * Verifies that the current user is an admin
+ * Verifies that the provided UID belongs to an admin user
+ * This should be called from Server Actions with the UID from the client
+ * @param uid The user ID to verify
+ */
+export async function verifyAdminByUid(uid: string) {
+  if (!uid) {
+    throw new Error('Unauthorized: No user ID provided');
+  }
+  
+  try {
+    const userRecord = await adminAuth.getUser(uid);
+    const customClaims = userRecord.customClaims || {};
+    
+    if (!customClaims.admin) {
+      throw new Error('Unauthorized: Admin access required');
+    }
+    
+    return { uid, admin: true };
+  } catch (error) {
+    console.error('Admin verification failed:', error);
+    throw new Error('Unauthorized: Admin verification failed');
+  }
+}
+
+/**
+ * Verifies that the current user is an admin (for API routes with Authorization header)
  * Throws error if not authenticated or not an admin
  */
 export async function verifyAdminToken() {
@@ -39,7 +65,7 @@ export async function verifyAdminToken() {
 }
 
 /**
- * Gets the current authenticated user's UID
+ * Gets the current authenticated user's UID (for API routes)
  * Returns null if not authenticated
  */
 export async function getCurrentUserId(): Promise<string | null> {
@@ -52,7 +78,7 @@ export async function getCurrentUserId(): Promise<string | null> {
 }
 
 /**
- * Checks if the current user owns the specified resource
+ * Checks if the current user owns the specified resource (for API routes)
  * @param resourceUserId The userId field from the resource
  */
 export async function verifyResourceOwnership(resourceUserId: string) {
