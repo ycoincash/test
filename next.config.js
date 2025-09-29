@@ -36,7 +36,7 @@ const nextConfig = {
     ],
   },
   experimental: {
-    allowedDevOrigins: ["https://6000-firebase-mine-1756413930474.cluster-oayqgyglpfgseqclbygurw4xd4.cloudworkstations.dev"],
+    allowedDevOrigins: true,
   },
   serverExternalPackages: ['xlsx'],
 };
