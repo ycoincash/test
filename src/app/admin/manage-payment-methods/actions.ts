@@ -1,20 +1,20 @@
 
 "use server";
 
-import { db } from '@/lib/firebase/config';
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, query, orderBy, doc } from 'firebase/firestore';
+import { adminDb } from '@/lib/firebase/admin-config';
+import * as admin from 'firebase-admin';
 import type { PaymentMethod } from '@/types';
 
 
 
 export async function getPaymentMethods(): Promise<PaymentMethod[]> {
-    const snapshot = await getDocs(query(collection(db, 'paymentMethods'), orderBy('name')));
+    const snapshot = await adminDb.collection('paymentMethods').orderBy('name').get();
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PaymentMethod));
 }
 
 export async function addPaymentMethod(data: Omit<PaymentMethod, 'id'>) {
     try {
-        await addDoc(collection(db, 'paymentMethods'), data);
+        await adminDb.collection('paymentMethods').add( data);
         return { success: true, message: 'تمت إضافة طريقة الدفع بنجاح.' };
     } catch (error) {
         console.error("Error adding payment method:", error);
@@ -24,7 +24,7 @@ export async function addPaymentMethod(data: Omit<PaymentMethod, 'id'>) {
 
 export async function updatePaymentMethod(id: string, data: Partial<PaymentMethod>) {
     try {
-        await updateDoc(doc(db, 'paymentMethods', id), data);
+        await adminDb.collection('paymentMethods').doc(id).update( data);
         return { success: true, message: 'تم تحديث طريقة الدفع بنجاح.' };
     } catch (error) {
         console.error("Error updating payment method:", error);
@@ -34,7 +34,7 @@ export async function updatePaymentMethod(id: string, data: Partial<PaymentMetho
 
 export async function deletePaymentMethod(id: string) {
     try {
-        await deleteDoc(doc(db, 'paymentMethods', id));
+        await adminDb.collection('paymentMethods').doc(id).delete();
         return { success: true, message: 'تم حذف طريقة الدفع بنجاح.' };
     } catch (error) {
         console.error("Error deleting payment method:", error);

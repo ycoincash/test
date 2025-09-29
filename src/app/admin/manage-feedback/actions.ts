@@ -2,12 +2,9 @@
 
 'use server';
 
-import { db } from '@/lib/firebase/config';
-import { collection, doc, getDocs, updateDoc, addDoc, serverTimestamp, query, where, Timestamp, writeBatch, deleteDoc, getDoc, runTransaction, increment, orderBy } from 'firebase/firestore';
+import { adminDb } from '@/lib/firebase/admin-config';
+import * as admin from 'firebase-admin';
 import type { FeedbackForm, FeedbackResponse, EnrichedFeedbackResponse, UserProfile } from '@/types';
-
-    return true;
-}
 
 
 const safeToDate = (timestamp: any): Date | undefined => {
@@ -23,7 +20,7 @@ const safeToDate = (timestamp: any): Date | undefined => {
 
 // Feedback System
 export async function getFeedbackForms(): Promise<FeedbackForm[]> {
-    const snapshot = await getDocs(query(collection(db, 'feedbackForms'), orderBy('createdAt', 'desc')));
+    const snapshot = await adminDb.collection('feedbackForms').orderBy('createdAt', 'desc').get();
     return snapshot.docs.map(doc => {
         const data = doc.data();
         return {
@@ -36,9 +33,9 @@ export async function getFeedbackForms(): Promise<FeedbackForm[]> {
 
 export async function addFeedbackForm(data: Omit<FeedbackForm, 'id' | 'createdAt' | 'responseCount'>) {
     try {
-        await addDoc(collection(db, 'feedbackForms'), {
+        await adminDb.collection('feedbackForms').add( {
             ...data,
-            createdAt: serverTimestamp(),
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
             responseCount: 0,
         });
         return { success: true, message: 'تم إنشاء نموذج الملاحظات بنجاح.' };
@@ -50,7 +47,7 @@ export async function addFeedbackForm(data: Omit<FeedbackForm, 'id' | 'createdAt
 
 export async function updateFeedbackForm(id: string, data: Partial<Omit<FeedbackForm, 'id' | 'createdAt'>>) {
     try {
-        await updateDoc(doc(db, 'feedbackForms', id), data);
+        await adminDb.collection('feedbackForms').doc(id).update( data);
         return { success: true, message: 'تم تحديث النموذج بنجاح.' };
     } catch (error) {
         console.error("Error updating feedback form:", error);
@@ -60,7 +57,7 @@ export async function updateFeedbackForm(id: string, data: Partial<Omit<Feedback
 
 export async function deleteFeedbackForm(id: string) {
     try {
-        await deleteDoc(doc(db, 'feedbackForms', id));
+        await adminDb.collection('feedbackForms').doc(id).delete();
         return { success: true, message: 'تم حذف النموذج بنجاح.' };
     } catch (error) {
         console.error("Error deleting feedback form:", error);
@@ -69,9 +66,9 @@ export async function deleteFeedbackForm(id: string) {
 }
 
 export async function getFeedbackFormById(formId: string): Promise<FeedbackForm | null> {
-    const docRef = doc(db, 'feedbackForms', formId);
-    const docSnap = await getDoc(docRef);
-    if (!docSnap.exists()) {
+    const docRef = adminDb.collection('feedbackForms').doc(formId);
+    const docSnap = await docRef.get();
+    if (!docSnap.exists) {
         return null;
     }
     const data = docSnap.data();
@@ -84,8 +81,8 @@ export async function getFeedbackFormById(formId: string): Promise<FeedbackForm 
 
 export async function getFeedbackResponses(formId: string): Promise<EnrichedFeedbackResponse[]> {
     // Query without ordering to avoid needing a composite index
-    const responsesQuery = query(collection(db, 'feedbackResponses'), where('formId', '==', formId));
-    const responsesSnap = await getDocs(responsesQuery);
+    const responsesQuery = adminDb.collection('feedbackResponses').where('formId', '==', formId);
+    const responsesSnap = await responsesQuery.get();
 
     const responses = responsesSnap.docs.map(doc => {
         const data = doc.data();
@@ -102,8 +99,8 @@ export async function getFeedbackResponses(formId: string): Promise<EnrichedFeed
     const userIds = [...new Set(responses.map(r => r.userId))];
     if (userIds.length === 0) return [];
 
-    const usersQuery = query(collection(db, 'users'), where('__name__', 'in', userIds));
-    const usersSnap = await getDocs(usersQuery);
+    const usersQuery = adminDb.collection('users').where(admin.firestore.FieldPath.documentId(), 'in', userIds);
+    const usersSnap = await usersQuery.get();
     const usersMap = new Map(usersSnap.docs.map(d => [d.id, d.data() as UserProfile]));
 
     return responses.map(response => ({

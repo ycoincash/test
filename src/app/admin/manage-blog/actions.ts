@@ -1,12 +1,9 @@
 
 'use server';
 
-import { db } from '@/lib/firebase/config';
-import { collection, doc, getDocs, updateDoc, addDoc, serverTimestamp, query, orderBy, deleteDoc } from 'firebase/firestore';
+import { adminDb } from '@/lib/firebase/admin-config';
+import * as admin from 'firebase-admin';
 import type { BlogPost } from '@/types';
-
-    return true;
-}
 
 const safeToDate = (timestamp: any): Date | undefined => {
     if (timestamp instanceof Date) return timestamp;
@@ -25,16 +22,16 @@ const convertTimestamps = (docData: any): BlogPost => {
 }
 
 export async function getAllBlogPosts(): Promise<BlogPost[]> {
-    const snapshot = await getDocs(query(collection(db, 'blogPosts'), orderBy('createdAt', 'desc')));
+    const snapshot = await adminDb.collection('blogPosts').orderBy('createdAt', 'desc').get();
     return snapshot.docs.map(convertTimestamps);
 }
 
 export async function addBlogPost(data: Omit<BlogPost, 'id' | 'createdAt' | 'updatedAt'>) {
     try {
-        await addDoc(collection(db, 'blogPosts'), {
+        await adminDb.collection('blogPosts').add( {
             ...data,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
         return { success: true, message: 'تم إنشاء المقال بنجاح.' };
     } catch (error) {
@@ -45,10 +42,10 @@ export async function addBlogPost(data: Omit<BlogPost, 'id' | 'createdAt' | 'upd
 
 export async function updateBlogPost(id: string, data: Partial<Omit<BlogPost, 'id' | 'createdAt'>>) {
     try {
-        const postRef = doc(db, 'blogPosts', id);
-        await updateDoc(postRef, {
+        const postRef = adminDb.collection('blogPosts').doc(id);
+        await postRef.update( {
             ...data,
-            updatedAt: serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
         return { success: true, message: 'تم تحديث المقال بنجاح.' };
     } catch (error) {
@@ -59,7 +56,7 @@ export async function updateBlogPost(id: string, data: Partial<Omit<BlogPost, 'i
 
 export async function deleteBlogPost(id: string) {
     try {
-        await deleteDoc(doc(db, 'blogPosts', id));
+        await adminDb.collection('blogPosts').doc(id).delete();
         return { success: true, message: 'تم حذف المقال بنجاح.' };
     } catch (error) {
         console.error("Error deleting blog post:", error);

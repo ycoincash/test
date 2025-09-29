@@ -1,15 +1,19 @@
 
 'use server';
 
-import { db } from '@/lib/firebase/config';
-import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
+import { adminDb } from '@/lib/firebase/admin-config';
+import * as admin from 'firebase-admin';
 import type { TradingAccount } from '@/types';
 import { addCashbackTransaction } from '../manage-cashback/actions';
 
-}
-
 const safeToDate = (timestamp: any): Date | undefined => {
-    if (timestamp instanceof Timestamp) {
+    if (timestamp && timestamp._seconds) {
+        return new Date(timestamp._seconds * 1000);
+    }
+    if (timestamp instanceof Date) {
+        return timestamp;
+    }
+    if (timestamp && typeof timestamp.toDate === 'function') {
         return timestamp.toDate();
     }
     if (timestamp && typeof timestamp.toDate === 'function') {
@@ -67,8 +71,8 @@ export async function processBulkCashback(validatedData: { accountNumber: string
 }
 
 export async function getApprovedAccounts(): Promise<TradingAccount[]> {
-    const accountsQuery = query(collection(db, 'tradingAccounts'), where('status', '==', 'Approved'));
-    const snapshot = await getDocs(accountsQuery);
+    const accountsQuery = adminDb.collection('tradingAccounts').where('status', '==', 'Approved');
+    const snapshot = await accountsQuery.get();
     return snapshot.docs.map(doc => {
         const data = doc.data();
         return { 

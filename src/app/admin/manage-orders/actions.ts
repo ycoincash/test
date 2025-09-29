@@ -1,16 +1,16 @@
 
 "use server";
 
-import { db } from '@/lib/firebase/config';
-import { collection, doc, getDocs, updateDoc, serverTimestamp, query, orderBy, runTransaction, increment, Transaction } from 'firebase/firestore';
+import { adminDb } from '@/lib/firebase/admin-config';
+import * as admin from 'firebase-admin';
 import type { Order, Notification } from '@/types';
 import { awardReferralCommission, clawbackReferralCommission, createNotification } from '../actions';
 
 
 export async function updateOrderStatus(orderId: string, status: Order['status']) {
     try {
-        await runTransaction(db, async (transaction) => {
-            const orderRef = doc(db, 'orders', orderId);
+        await adminDb.runTransaction, async (transaction) => {
+            const orderRef = adminDb.collection('orders').doc(orderId);
             const orderSnap = await transaction.get(orderRef);
             if (!orderSnap.exists()) {
                 throw new Error("لم يتم العثور على الطلب.");

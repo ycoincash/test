@@ -1,16 +1,16 @@
 
 'use server';
 
-import { db } from '@/lib/firebase/config';
-import { collection, doc, getDocs, writeBatch, setDoc } from 'firebase/firestore';
+import { adminDb } from '@/lib/firebase/admin-config';
+import * as admin from 'firebase-admin';
 import type { ClientLevel } from '@/types';
 
 
 export async function updateClientLevels(levels: ClientLevel[]) {
     try {
-        const batch = writeBatch(db);
+        const batch = adminDb.batch();
         levels.forEach(level => {
-            const levelRef = doc(db, 'clientLevels', String(level.id));
+            const levelRef = adminDb.collection('clientLevels').doc(String(level.id));
             // The 'id' is the document ID, so we don't need to save it inside the document.
             const { id, ...levelData } = level;
             batch.set(levelRef, levelData);
@@ -24,8 +24,8 @@ export async function updateClientLevels(levels: ClientLevel[]) {
 }
 
 export async function seedClientLevels(): Promise<{ success: boolean; message: string; }> {
-    const levelsCollection = collection(db, 'clientLevels');
-    const snapshot = await getDocs(levelsCollection);
+    const levelsCollection = adminDb.collection('clientLevels');
+    const snapshot = await levelsCollection.get();
     if (!snapshot.empty) {
         return { success: false, message: 'مستويات العملاء موجودة بالفعل.' };
     }
@@ -40,10 +40,10 @@ export async function seedClientLevels(): Promise<{ success: boolean; message: s
     ];
 
     try {
-        const batch = writeBatch(db);
+        const batch = adminDb.batch();
         defaultLevels.forEach((level, index) => {
             const levelId = String(index + 1);
-            const docRef = doc(db, 'clientLevels', levelId);
+            const docRef = adminDb.collection('clientLevels').doc(levelId);
             batch.set(docRef, level);
         });
         await batch.commit();

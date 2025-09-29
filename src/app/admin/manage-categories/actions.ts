@@ -1,16 +1,13 @@
 
 "use server";
 
-import { db } from '@/lib/firebase/config';
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, query, orderBy, doc } from 'firebase/firestore';
+import { adminDb } from '@/lib/firebase/admin-config';
+import * as admin from 'firebase-admin';
 import type { ProductCategory } from '@/types';
-
-    return true;
-}
 
 export async function addCategory(data: Omit<ProductCategory, 'id'>) {
     try {
-        await addDoc(collection(db, 'productCategories'), data);
+        await adminDb.collection('productCategories').add(data);
         return { success: true, message: 'تمت إضافة الفئة بنجاح.' };
     } catch (error) {
         console.error("Error adding category:", error);
@@ -20,7 +17,7 @@ export async function addCategory(data: Omit<ProductCategory, 'id'>) {
 
 export async function updateCategory(id: string, data: Partial<ProductCategory>) {
     try {
-        await updateDoc(doc(db, 'productCategories', id), data);
+        await adminDb.collection('productCategories').doc(id).update(data);
         return { success: true, message: 'تم تحديث الفئة بنجاح.' };
     } catch (error) {
         console.error("Error updating category:", error);
@@ -30,7 +27,7 @@ export async function updateCategory(id: string, data: Partial<ProductCategory>)
 
 export async function deleteCategory(id: string) {
     try {
-        await deleteDoc(doc(db, 'productCategories', id));
+        await adminDb.collection('productCategories').doc(id).delete();
         return { success: true, message: 'تم حذف الفئة بنجاح.' };
     } catch (error) {
         console.error("Error deleting category:", error);

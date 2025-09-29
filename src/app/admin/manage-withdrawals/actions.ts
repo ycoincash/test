@@ -1,91 +1,118 @@
+'use server';
 
-"use server";
-
-import { db } from '@/lib/firebase/config';
-import { collection, doc, getDocs, updateDoc, serverTimestamp, query, orderBy, runTransaction, Timestamp } from 'firebase/firestore';
+import { adminDb } from '@/lib/firebase/admin-config';
+import * as admin from 'firebase-admin';
 import type { Withdrawal } from '@/types';
 import { createNotification } from '../actions';
 
-
-
 const safeToDate = (timestamp: any): Date | undefined => {
-    if (timestamp instanceof Timestamp) {
-        return timestamp.toDate();
-    }
-    if (timestamp && typeof timestamp.toDate === 'function') {
-        return timestamp.toDate();
-    }
-    return undefined;
+  if (!timestamp) return undefined;
+  if (timestamp instanceof Date) return timestamp;
+  if (timestamp?._seconds) {
+    return new Date(timestamp._seconds * 1000);
+  }
+  if (typeof timestamp?.toDate === 'function') {
+    return timestamp.toDate();
+  }
+  return undefined;
 };
 
 export async function getWithdrawals(): Promise<Withdrawal[]> {
-    const withdrawalsSnapshot = await getDocs(query(collection(db, 'withdrawals'), orderBy('requestedAt', 'desc')));
-    const withdrawals: Withdrawal[] = [];
+  const withdrawalsSnapshot = await adminDb
+    .collection('withdrawals')
+    .orderBy('requestedAt', 'desc')
+    .get();
 
-    withdrawalsSnapshot.docs.forEach(doc => {
-        try {
-            const data = doc.data();
-            withdrawals.push({
-                id: doc.id,
-                ...data,
-                requestedAt: safeToDate(data.requestedAt) || new Date(),
-                completedAt: safeToDate(data.completedAt),
-                previousWithdrawalDetails: null, 
-            } as Withdrawal);
-        } catch (error) {
-            console.error(`Error processing withdrawal ${doc.id}:`, error);
-        }
-    });
+  const withdrawals: Withdrawal[] = [];
 
-    return withdrawals;
+  withdrawalsSnapshot.docs.forEach((doc) => {
+    try {
+      const data = doc.data();
+      withdrawals.push({
+        id: doc.id,
+        ...data,
+        requestedAt: safeToDate(data.requestedAt) || new Date(),
+        completedAt: safeToDate(data.completedAt),
+        previousWithdrawalDetails: null,
+      } as Withdrawal);
+    } catch (error) {
+      console.error(`Error processing withdrawal ${doc.id}:`, error);
+    }
+  });
+
+  return withdrawals;
 }
 
 export async function approveWithdrawal(withdrawalId: string, txId: string) {
-    try {
-        await runTransaction(db, async (transaction) => {
-            const withdrawalRef = doc(db, 'withdrawals', withdrawalId);
-            const withdrawalSnap = await transaction.get(withdrawalRef);
-            if (!withdrawalSnap.exists()) throw new Error("لم يتم العثور على طلب السحب");
-            const withdrawalData = withdrawalSnap.data() as Withdrawal;
+  try {
+    await adminDb.runTransaction(async (transaction) => {
+      const withdrawalRef = adminDb.collection('withdrawals').doc(withdrawalId);
+      const withdrawalSnap = await transaction.get(withdrawalRef);
 
-            transaction.update(withdrawalRef, {
-                status: 'Completed',
-                completedAt: serverTimestamp(),
-                txId: txId,
-                rejectionReason: "",
-            });
+      if (!withdrawalSnap.exists) {
+        throw new Error('لم يتم العثور على طلب السحب');
+      }
 
-            const message = `تم إكمال طلب السحب الخاص بك بمبلغ ${withdrawalData.amount.toFixed(2)}$.`;
-            await createNotification(transaction, withdrawalData.userId, message, 'withdrawal', '/dashboard/withdraw');
-        });
+      const withdrawalData = withdrawalSnap.data() as Withdrawal;
 
-        return { success: true, message: 'تمت الموافقة على السحب بنجاح مع TXID.' };
-    } catch (error) {
-        console.error("Error approving withdrawal:", error);
-        return { success: false, message: 'فشل الموافقة على السحب.' };
-    }
+      transaction.update(withdrawalRef, {
+        status: 'Completed',
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        txId: txId,
+        rejectionReason: '',
+      });
+
+      const message = `تم إكمال طلب السحب الخاص بك بمبلغ ${withdrawalData.amount.toFixed(
+        2
+      )}$.`;
+      await createNotification(
+        transaction,
+        withdrawalData.userId,
+        message,
+        'withdrawal',
+        '/dashboard/withdraw'
+      );
+    });
+
+    return { success: true, message: 'تمت الموافقة على السحب بنجاح مع TXID.' };
+  } catch (error) {
+    console.error('Error approving withdrawal:', error);
+    return { success: false, message: 'فشل الموافقة على السحب.' };
+  }
 }
 
 export async function rejectWithdrawal(withdrawalId: string, reason: string) {
-     try {
-        await runTransaction(db, async (transaction) => {
-            const withdrawalRef = doc(db, 'withdrawals', withdrawalId);
-            const withdrawalSnap = await transaction.get(withdrawalRef);
-            if (!withdrawalSnap.exists()) throw new Error("لم يتم العثور على طلب السحب");
-            const withdrawalData = withdrawalSnap.data() as Withdrawal;
+  try {
+    await adminDb.runTransaction(async (transaction) => {
+      const withdrawalRef = adminDb.collection('withdrawals').doc(withdrawalId);
+      const withdrawalSnap = await transaction.get(withdrawalRef);
 
-            if (!reason) throw new Error("سبب الرفض مطلوب.");
+      if (!withdrawalSnap.exists) {
+        throw new Error('لم يتم العثور على طلب السحب');
+      }
 
-            transaction.update(withdrawalRef, { status: 'Failed', rejectionReason: reason });
+      const withdrawalData = withdrawalSnap.data() as Withdrawal;
 
-            const message = `فشل طلب السحب الخاص بك بمبلغ ${withdrawalData.amount.toFixed(2)}$. السبب: ${reason}`;
-            await createNotification(transaction, withdrawalData.userId, message, 'withdrawal', '/dashboard/withdraw');
-        });
+      if (!reason) throw new Error('سبب الرفض مطلوب.');
 
-        return { success: true, message: `تم تحديث حالة السحب إلى "فشل".` };
-    } catch (error) {
-        console.error("Error rejecting withdrawal:", error);
-        const errorMessage = error instanceof Error ? error.message : "حدث خطأ غير معروف";
-        return { success: false, message: `فشل رفض السحب: ${errorMessage}` };
-    }
+      transaction.update(withdrawalRef, { status: 'Failed', rejectionReason: reason });
+
+      const message = `فشل طلب السحب الخاص بك بمبلغ ${withdrawalData.amount.toFixed(
+        2
+      )}$. السبب: ${reason}`;
+      await createNotification(
+        transaction,
+        withdrawalData.userId,
+        message,
+        'withdrawal',
+        '/dashboard/withdraw'
+      );
+    });
+
+    return { success: true, message: `تم تحديث حالة السحب إلى "فشل".` };
+  } catch (error) {
+    console.error('Error rejecting withdrawal:', error);
+    const errorMessage = error instanceof Error ? error.message : 'حدث خطأ غير معروف';
+    return { success: false, message: `فشل رفض السحب: ${errorMessage}` };
+  }
 }

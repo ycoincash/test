@@ -2,16 +2,15 @@
 
 'use server';
 
-import { db } from '@/lib/firebase/config';
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, query, orderBy, doc, where } from 'firebase/firestore';
+import { adminDb } from '@/lib/firebase/admin-config';
+import * as admin from 'firebase-admin';
 import type { Offer, UserProfile } from '@/types';
 import { getClientSessionInfo } from '@/lib/device-info';
-import { getAuth } from 'firebase/auth';
 
 
 export async function addOffer(data: Omit<Offer, 'id'>) {
     try {
-        await addDoc(collection(db, 'offers'), data);
+        await adminDb.collection('offers').add( data);
         return { success: true, message: 'تمت إضافة العرض بنجاح.' };
     } catch (error) {
         console.error("Error adding offer:", error);
@@ -21,7 +20,7 @@ export async function addOffer(data: Omit<Offer, 'id'>) {
 
 export async function updateOffer(id: string, data: Partial<Omit<Offer, 'id'>>) {
     try {
-        await updateDoc(doc(db, 'offers', id), data);
+        await adminDb.collection('offers').doc(id).update( data);
         return { success: true, message: 'تم تحديث العرض بنجاح.' };
     } catch (error) {
         console.error("Error updating offer:", error);
@@ -31,7 +30,7 @@ export async function updateOffer(id: string, data: Partial<Omit<Offer, 'id'>>) 
 
 export async function deleteOffer(id: string) {
     try {
-        await deleteDoc(doc(db, 'offers', id));
+        await adminDb.collection('offers').doc(id).delete();
         return { success: true, message: 'تم حذف العرض بنجاح.' };
     } catch (error) {
         console.error("Error deleting offer:", error);
@@ -40,7 +39,7 @@ export async function deleteOffer(id: string) {
 }
 
 export async function getOffers(): Promise<Offer[]> {
-    const snapshot = await getDocs(query(collection(db, 'offers')));
+    const snapshot = await adminDb.collection('offers').get();
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Offer));
 }
 
@@ -51,8 +50,8 @@ export async function getOffersForUser(user: UserProfile | undefined): Promise<O
         const { geoInfo } = await getClientSessionInfo();
         const userCountry = geoInfo.country;
 
-        const q = query(collection(db, 'offers'), where('isEnabled', '==', true));
-        const snapshot = await getDocs(q);
+        const q = adminDb.collection('offers').where('isEnabled', '==', true);
+        const snapshot = await q.get();
         
         const offers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Offer));
 
