@@ -6,6 +6,8 @@ import type { GenerateProjectSummaryOutput } from "@/ai/flows/generate-project-s
 import { calculateCashback } from "@/ai/flows/calculate-cashback";
 import type { CalculateCashbackInput, CalculateCashbackOutput } from "@/ai/flows/calculate-cashback";
 import { auth, db } from "@/lib/firebase/config";
+import { adminDb } from '@/lib/firebase/admin-config';
+import * as admin from 'firebase-admin';
 import { createUserWithEmailAndPassword, signOut, sendPasswordResetEmail, deleteUser } from "firebase/auth";
 import { doc, setDoc, Timestamp, getDocs, collection, query, where, runTransaction, arrayUnion, writeBatch, increment, getDoc, updateDoc, addDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
 import { generateReferralCode } from "@/lib/referral";
@@ -53,69 +55,85 @@ export async function handleCalculateCashback(input: CalculateCashbackInput): Pr
 export async function handleRegisterUser(formData: { name: string, email: string, password: string, referralCode?: string }) {
     const { name, email, password, referralCode } = formData;
     
-    let referrerData: { id: string; ref: any; } | null = null;
+    let referrerId: string | null = null;
 
+    // Validate referral code using Admin SDK (bypasses Firestore rules)
     if (referralCode) {
-        const q = query(collection(db, 'users'), where('referralCode', '==', referralCode));
-        const querySnapshot = await getDocs(q);
-        if (querySnapshot.empty) {
-            return { success: false, error: "The referral code you entered is not valid." };
+        try {
+            const usersQuery = adminDb.collection('users').where('referralCode', '==', referralCode);
+            const querySnapshot = await usersQuery.get();
+            if (querySnapshot.empty) {
+                return { success: false, error: "The referral code you entered is not valid." };
+            }
+            referrerId = querySnapshot.docs[0].id;
+        } catch (error) {
+            console.error("Error validating referral code:", error);
+            return { success: false, error: "Failed to validate referral code." };
         }
-        const referrerDoc = querySnapshot.docs[0];
-        referrerData = { id: referrerDoc.id, ref: referrerDoc.ref };
     }
 
     let userCredential;
     try {
+        // Create Firebase Auth user
         userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
 
-        await runTransaction(db, async (transaction) => {
-            const counterRef = doc(db, 'counters', 'userCounter');
+        // Use Admin SDK transaction for atomic counter increment and user creation
+        const newClientId = await adminDb.runTransaction(async (transaction) => {
+            const counterRef = adminDb.collection('counters').doc('userCounter');
             const counterSnap = await transaction.get(counterRef);
-            const lastId = counterSnap.exists() ? counterSnap.data().lastId : 100000;
-            const newClientId = lastId + 1;
+            const lastId = counterSnap.exists ? (counterSnap.data()?.lastId || 100000) : 100000;
+            const clientId = lastId + 1;
 
-            const newUserRef = doc(db, "users", user.uid);
-            transaction.set(newUserRef, {
+            // Create user document
+            const userRef = adminDb.collection('users').doc(user.uid);
+            transaction.set(userRef, {
                 name,
                 email,
-                clientId: newClientId,
+                clientId,
                 role: "user",
-                status: "NEW", // Default status for new users
-                createdAt: Timestamp.now(),
+                status: "NEW",
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
                 referralCode: generateReferralCode(name),
-                referredBy: referrerData ? referrerData.id : null,
+                referredBy: referrerId,
                 referrals: [],
                 level: 1,
                 monthlyEarnings: 0,
                 country: null,
             });
 
-            if (referrerData) {
-                transaction.update(referrerData.ref, {
-                    referrals: arrayUnion(user.uid)
+            // Update referrer's referrals array if applicable
+            if (referrerId) {
+                const referrerRef = adminDb.collection('users').doc(referrerId);
+                transaction.update(referrerRef, {
+                    referrals: admin.firestore.FieldValue.arrayUnion(user.uid)
                 });
             }
-            
-            transaction.set(counterRef, { lastId: newClientId }, { merge: true });
+
+            // Update counter atomically
+            transaction.set(counterRef, { lastId: clientId }, { merge: true });
+
+            return clientId;
         });
         
         return { success: true, userId: user.uid };
 
     } catch (error: any) {
-        // If user was created in Auth but Firestore transaction failed, delete the user.
+        // If user was created in Auth but Firestore operations failed, delete the user using Admin SDK
         if (userCredential) {
-            await deleteUser(userCredential.user);
+            try {
+                await admin.auth().deleteUser(userCredential.user.uid);
+            } catch (deleteError) {
+                console.error("Failed to delete user after registration failure:", deleteError);
+            }
         }
 
-        console.error("Registration Error: ", error);
+        console.error("Registration Error:", error);
         
         if (error.code === 'auth/email-already-in-use') {
             return { success: false, error: "This email is already in use. Please log in." };
         }
         
-        // Generic error for other issues
         return { success: false, error: "An unexpected error occurred during registration. Please try again." };
     }
 }
