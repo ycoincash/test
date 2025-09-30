@@ -688,6 +688,76 @@ export async function getAdminDashboardStats(idToken: string) {
   };
 }
 
+// User function - gets referral data for specific user
+export async function getUserReferralData(idToken: string) {
+  // Verify the ID token and extract the user ID
+  const decodedToken = await verifyClientIdToken(idToken);
+  const userId = decodedToken.uid;
+  
+  // Get user profile
+  const userDoc = await adminDb.collection('users').doc(userId).get();
+  if (!userDoc.exists) {
+    throw new Error('User not found');
+  }
+  
+  const userData = userDoc.data();
+  
+  // Get referral users
+  const referralUids = userData?.referrals || [];
+  const referralPromises = referralUids.map((uid: string) => 
+    adminDb.collection('users').doc(uid).get()
+  );
+  const referralDocs = await Promise.all(referralPromises);
+  
+  const referrals = referralDocs
+    .filter(doc => doc.exists)
+    .map(doc => ({
+      uid: doc.id,
+      name: doc.data()?.name,
+      createdAt: doc.data()?.createdAt?.toDate() || new Date(),
+      status: doc.data()?.status,
+    }));
+  
+  // Get commission history  
+  const commissionSnapshot = await adminDb.collection('cashbackTransactions')
+    .where('userId', '==', userId)
+    .where('sourceType', 'in', ['cashback', 'store_purchase'])
+    .get();
+  
+  const commissionHistory = commissionSnapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      ...data,
+      date: data.date?.toDate() || new Date(),
+    };
+  });
+  
+  commissionHistory.sort((a: any, b: any) => b.date.getTime() - a.date.getTime());
+  
+  return {
+    userProfile: {
+      uid: userDoc.id,
+      referralCode: userData?.referralCode,
+      referrals: userData?.referrals || [],
+    },
+    referrals,
+    commissionHistory,
+  };
+}
+
+// Public function - gets enabled offers
+export async function getEnabledOffers() {
+  const offersSnapshot = await adminDb.collection('offers')
+    .where('isEnabled', '==', true)
+    .get();
+  
+  return offersSnapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data(),
+  }));
+}
+
 export async function getPublishedBlogPosts(): Promise<BlogPost[]> {
     const q = query(
         collection(db, 'blogPosts'), 

@@ -4,8 +4,6 @@
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { useAuthContext } from "@/hooks/useAuthContext";
-import { db } from "@/lib/firebase/config";
-import { collection, query, where, getDocs, Timestamp } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, PlusCircle, Briefcase, CheckCircle, Clock, XCircle, Wifi, Cpu, ChevronLeft } from "lucide-react";
@@ -14,8 +12,8 @@ import type { TradingAccount, CashbackTransaction } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Image from "next/image";
-import { getTradingAccounts } from "@/app/admin/manage-accounts/actions";
-import { getCashbackTransactions } from "@/app/actions";
+import { getUserTradingAccounts, getCashbackTransactions } from "@/app/actions";
+import { getCurrentUserIdToken } from "@/lib/client-auth";
 import { cn } from "@/lib/utils";
 
 function AccountCard({ account, totalEarned }: { account: TradingAccount, totalEarned: number }) {
@@ -118,12 +116,13 @@ export default function MyAccountsPage() {
             
             setIsLoading(true);
             try {
+                const idToken = await getCurrentUserIdToken();
                 const [fetchedAccounts, userTransactions] = await Promise.all([
-                    getTradingAccounts(),
-                    getCashbackTransactions(user.uid)
+                    getUserTradingAccounts(idToken),
+                    getCashbackTransactions(idToken)
                 ]);
                 
-                const userAccounts = fetchedAccounts.filter(acc => acc.userId === user.uid);
+                const userAccounts = fetchedAccounts;
                 userAccounts.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
                 setAccounts(userAccounts);
                 setTransactions(userTransactions);

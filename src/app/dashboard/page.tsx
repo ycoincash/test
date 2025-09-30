@@ -8,11 +8,9 @@ import { useAuthContext } from "@/hooks/useAuthContext";
 import { DollarSign, Briefcase, PlusCircle, Landmark, ArrowRight, Users, Gift, Copy, Wallet, MessageSquare, ChevronLeft, KeyRound, History, Settings, Store, ShoppingBag, Download, BadgePercent } from "lucide-react";
 import Link from 'next/link';
 import { useEffect, useState, useRef } from "react";
-import { db } from "@/lib/firebase/config";
-import { collection, query, where, getCountFromServer, getDocs, Timestamp, orderBy, limit } from "firebase/firestore";
 import { Loader2 } from "lucide-react";
 import type { TradingAccount, CashbackTransaction, FeedbackForm, Offer, BannerSettings, UserProfile } from "@/types";
-import { getUserBalance, getUserTradingAccounts, getCashbackTransactions, getActiveFeedbackFormForUser, submitFeedbackResponse } from "../actions";
+import { getUserBalance, getUserTradingAccounts, getCashbackTransactions, getActiveFeedbackFormForUser, submitFeedbackResponse, getEnabledOffers } from "../actions";
 import { getCurrentUserIdToken } from "@/lib/client-auth";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
@@ -73,9 +71,7 @@ function OffersTabContent() {
                 return;
             }
             try {
-                const q = query(collection(db, 'offers'), where('isEnabled', '==', true));
-                const snapshot = await getDocs(q);
-                const allOffers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Offer));
+                const allOffers = await getEnabledOffers() as Offer[];
                 
                 const { geoInfo } = await getClientSessionInfo();
                 const userCountry = geoInfo.country;
