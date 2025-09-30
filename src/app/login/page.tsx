@@ -88,6 +88,28 @@ export default function LoginPage() {
         userProfile = { uid: user.uid, ...userDoc.data() };
         await logUserActivity(user.uid, 'login', clientInfo, { method: userCredential.providerId || 'email' });
     }
+
+    // Set secure HTTP-only cookie for authentication
+    try {
+        const idToken = await user.getIdToken();
+        const response = await fetch('/api/auth/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idToken }),
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to create session');
+        }
+    } catch (error) {
+        console.error('Session creation error:', error);
+        toast({
+            variant: "destructive",
+            title: "Session Error",
+            description: "Failed to create secure session. Please try logging in again.",
+        });
+        return;
+    }
     
     window.dispatchEvent(new CustomEvent('refetchUser'));
 

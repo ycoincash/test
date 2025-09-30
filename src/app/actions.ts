@@ -146,7 +146,12 @@ export async function handleRegisterUser(formData: { name: string, email: string
 
 export async function handleLogout() {
     try {
+        // Clear HTTP-only auth cookie
+        await fetch('/api/auth/logout', { method: 'POST' });
+        
+        // Sign out from Firebase client
         await signOut(auth);
+        
         return { success: true };
     } catch (error) {
         console.error("Logout Error: ", error);

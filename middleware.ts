@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authMiddleware } from 'next-firebase-auth-edge';
 import { getServerConfig } from './src/lib/firebase/auth-edge-config';
 
-const PUBLIC_PATHS = ['/register', '/login', '/', '/blog'];
-
 export async function middleware(request: NextRequest) {
   const config = getServerConfig();
 
@@ -16,32 +14,18 @@ export async function middleware(request: NextRequest) {
     cookieSerializeOptions: config.cookieSerializeOptions,
     serviceAccount: config.serviceAccount,
     handleValidToken: async ({ token, decodedToken }, headers) => {
-      if (PUBLIC_PATHS.some(path => request.nextUrl.pathname.startsWith(path))) {
-        return NextResponse.redirect(new URL('/dashboard', request.url));
-      }
-      
+      // User has valid token and is trying to access protected route
       return NextResponse.next({
         request: { headers }
       });
     },
     handleInvalidToken: async (reason) => {
-      if (PUBLIC_PATHS.some(path => request.nextUrl.pathname.startsWith(path))) {
-        return NextResponse.next();
-      }
-      
-      if (request.nextUrl.pathname.startsWith('/api/')) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
-      
+      // User has invalid/no token trying to access protected route
+      console.log('Invalid token, redirecting to login:', reason);
       return NextResponse.redirect(new URL('/login', request.url));
     },
     handleError: async (error) => {
       console.error('Authentication middleware error:', error);
-      
-      if (request.nextUrl.pathname.startsWith('/api/')) {
-        return NextResponse.json({ error: 'Authentication error' }, { status: 500 });
-      }
-      
       return NextResponse.redirect(new URL('/login', request.url));
     },
   });
@@ -52,7 +36,5 @@ export const config = {
     '/dashboard/:path*',
     '/admin/:path*',
     '/phone-verification',
-    '/api/auth/session',
-    '/api/auth/logout',
   ],
 };

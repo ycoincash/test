@@ -4,6 +4,20 @@ import { getServerConfig } from '@/lib/firebase/auth-edge-config';
 
 export async function POST(request: NextRequest) {
   try {
+    // CSRF protection: Validate Origin/Referer
+    const origin = request.headers.get('origin');
+    const referer = request.headers.get('referer');
+    const host = request.headers.get('host');
+    
+    if (!origin && !referer) {
+      return NextResponse.json({ error: 'Missing origin/referer' }, { status: 403 });
+    }
+    
+    const requestOrigin = origin || (referer ? new URL(referer).origin : null);
+    if (!requestOrigin || !host || !requestOrigin.includes(host)) {
+      return NextResponse.json({ error: 'Invalid origin' }, { status: 403 });
+    }
+
     const { idToken } = await request.json();
 
     if (!idToken) {
@@ -12,6 +26,7 @@ export async function POST(request: NextRequest) {
 
     const config = getServerConfig();
     
+    // Verify ID token and get session tokens
     const tokens = await getTokens(idToken, {
       serviceAccount: config.serviceAccount,
       apiKey: config.apiKey,
@@ -28,6 +43,7 @@ export async function POST(request: NextRequest) {
       }
     }, { status: 200 });
 
+    // Set HTTP-only, secure, signed cookie
     response.cookies.set({
       name: config.cookieName,
       value: tokens.token,
@@ -42,4 +58,9 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+// Reject non-POST requests
+export async function GET() {
+  return NextResponse.json({ error: 'Method not allowed' }, { status: 405 });
 }
