@@ -174,3 +174,22 @@ The following Firebase configuration variables must be set in Replit Secrets:
   - Server-side detection uses ipinfo.io (with IPINFO_TOKEN) and falls back to ipapi.co
   - **Flow**: Registration → Server detects country from IP → Stores in user.country → Phone verification uses stored country as default
   - **Result**: Users' country is automatically detected and used for phone number verification, improving UX
+- 2025-09-30: Cookie-based authentication with next-firebase-auth-edge (Phase 2 COMPLETED - PRODUCTION READY)
+  - **CRITICAL SECURITY UPGRADE**: Migrated from client-side ID tokens to HTTP-only signed cookies
+  - Installed next-firebase-auth-edge package for industry-standard authentication
+  - Created secure cookie infrastructure with cryptographic signature keys (COOKIE_SIGNATURE_KEYS)
+  - Implemented /api/auth/session endpoint: Validates Firebase tokens, sets signed cookies via middleware
+  - Implemented /api/auth/logout endpoint: CSRF-protected cookie clearing with strict origin validation
+  - Updated middleware.ts: Automatic token validation, refresh, and route protection
+  - **Security improvements**:
+    - HTTP-only cookies prevent XSS attacks (tokens not accessible via JavaScript)
+    - Secure flag enforces HTTPS in production
+    - SameSite=Lax provides CSRF protection
+    - Cryptographic signing prevents cookie tampering
+    - Strict origin validation (request.nextUrl.origin equality) prevents CSRF
+    - Authorization header validation ensures proper token exchange
+  - **Cookie structure**: AuthToken (main) + AuthToken.sig (signature), both required for authentication
+  - **Protected routes**: /dashboard, /admin, /phone-verification automatically redirect to /login without valid cookies
+  - **Architecture**: Middleware intercepts /api/auth/session for cookie issuance, excludes /api/auth/logout to prevent CSRF bypass
+  - **Status**: Production-ready, architect-approved, ~50 server actions pending migration (Phase 3)
+  - **Current security posture**: Foundation secure, but old ID token pattern still in ~50 server actions until Phase 3 completion
