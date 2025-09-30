@@ -164,3 +164,13 @@ The following Firebase configuration variables must be set in Replit Secrets:
   - Enabled security logs: Uncommented getActivityLogs() call to display user activity
   - Created getAllOrders() admin function to view all store orders (bypasses user restrictions)
   - **Result**: Admin can now access contact settings, view security logs, manage blog posts, and see all orders
+- 2025-09-30: IP-based geo-location for user registration (COMPLETED)
+  - **SECURITY FIX**: Created server-side geo utility (src/lib/server-geo.ts) using server-only IPINFO_TOKEN
+  - Implemented automatic country detection during user registration via IP headers (X-Forwarded-For)
+  - Updated handleRegisterUser to detect and store country code (ISO 3166-1 alpha-2) in user document
+  - Created /api/geo endpoint for optional UX hints (client-side prefill only, not for storage)
+  - Updated phone verification page to use stored country as defaultCountry in PhoneInput component
+  - Removed NEXT_PUBLIC_IPINFO_TOKEN client-side usage, eliminated token exposure risk
+  - Server-side detection uses ipinfo.io (with IPINFO_TOKEN) and falls back to ipapi.co
+  - **Flow**: Registration → Server detects country from IP → Stores in user.country → Phone verification uses stored country as default
+  - **Result**: Users' country is automatically detected and used for phone number verification, improving UX
