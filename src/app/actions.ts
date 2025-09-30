@@ -340,22 +340,25 @@ export async function getCategories(): Promise<ProductCategory[]> {
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProductCategory));
 }
 
-export async function getOrders(userId: string): Promise<Order[]> {
-    const q = query(
-        collection(db, 'orders'),
-        where('userId', '==', userId),
-    );
-    const snapshot = await getDocs(q);
-    const orders = snapshot.docs.map(doc => {
+// User function - gets user's own orders with ID token verification
+export async function getOrders(idToken: string): Promise<Order[]> {
+    // Verify the ID token and extract the user ID
+    const decodedToken = await verifyClientIdToken(idToken);
+    const userId = decodedToken.uid;
+    
+    const ordersSnapshot = await adminDb.collection('orders')
+        .where('userId', '==', userId)
+        .orderBy('createdAt', 'desc')
+        .get();
+    
+    return ordersSnapshot.docs.map(doc => {
         const data = doc.data();
         return {
             id: doc.id,
             ...data,
-            createdAt: safeToDate(data.createdAt) || new Date(),
+            createdAt: data.createdAt?.toDate() || new Date(),
         } as Order;
     });
-    orders.sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime());
-    return orders;
 }
 
 export async function getCashbackTransactions(idToken: string): Promise<CashbackTransaction[]> {

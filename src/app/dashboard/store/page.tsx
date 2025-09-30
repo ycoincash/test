@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { getProducts, getCategories, getOrders } from '@/app/actions';
+import { getCurrentUserIdToken } from '@/lib/client-auth';
 import type { Product, ProductCategory, Order } from '@/types';
 import { Loader2, ShoppingCart } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -78,7 +79,8 @@ function MyOrdersList() {
             if (!user) return;
             setIsLoading(true);
             try {
-                const userOrders = await getOrders(user.uid);
+                const idToken = await getCurrentUserIdToken();
+                const userOrders = await getOrders(idToken);
                 setOrders(userOrders);
             } catch (error) {
                 console.error("Error fetching orders:", error);

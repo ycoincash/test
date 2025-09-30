@@ -132,3 +132,12 @@ The following Firebase configuration variables must be set in Replit Secrets:
   - Complete flow: User submits → Server verifies token → Stores as Pending → Admin approves/rejects
   - **Result**: Users can now successfully submit trading accounts for review with proper security
   - **Status**: Production-ready, architect-approved
+- 2025-09-30: Store orders security fix (COMPLETED)
+  - **CRITICAL SECURITY FIX**: Fixed horizontal privilege escalation vulnerability in getOrders()
+  - Converted getOrders() from client SDK to Admin SDK with ID token verification
+  - Function previously accepted userId from client (allowing users to view others' orders)
+  - Now verifies ID token and derives userId server-side
+  - Updated MyOrdersList component to pass ID token instead of userId
+  - Firestore rules already properly restrict order access to owner only
+  - **Result**: Users can now only view their own orders, security vulnerability eliminated
+  - **Status**: Production-ready, architect-approved
