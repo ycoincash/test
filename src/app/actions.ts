@@ -9,6 +9,7 @@ import { auth, db } from "@/lib/firebase/config";
 import { adminDb } from '@/lib/firebase/admin-config';
 import { FieldValue } from 'firebase-admin/firestore';
 import { verifyClientIdToken } from '@/lib/auth-helpers';
+import { getAuthenticatedUser } from '@/lib/auth/server-auth';
 import * as admin from 'firebase-admin';
 import { createUserWithEmailAndPassword, signOut, sendPasswordResetEmail, deleteUser } from "firebase/auth";
 import { doc, setDoc, Timestamp, getDocs, collection, query, where, runTransaction, arrayUnion, writeBatch, increment, getDoc, updateDoc, addDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
@@ -215,10 +216,10 @@ export async function getClientLevels(): Promise<ClientLevel[]> {
     return levelsArray;
 }
 
-export async function getNotificationsForUser(idToken: string): Promise<Notification[]> {
-    // Verify the ID token and extract the user ID
-    const decodedToken = await verifyClientIdToken(idToken);
-    const userId = decodedToken.uid;
+export async function getNotificationsForUser(): Promise<Notification[]> {
+    // Get authenticated user from session cookies
+    const user = await getAuthenticatedUser();
+    const userId = user.uid;
     
     // Use Admin SDK to bypass Firestore rules (server-side only)
     const querySnapshot = await adminDb.collection('notifications')
@@ -239,10 +240,10 @@ export async function getNotificationsForUser(idToken: string): Promise<Notifica
     return notifications;
 }
 
-export async function markNotificationsAsRead(idToken: string, notificationIds: string[]) {
-    // Verify the ID token and extract the user ID
-    const decodedToken = await verifyClientIdToken(idToken);
-    const userId = decodedToken.uid;
+export async function markNotificationsAsRead(notificationIds: string[]) {
+    // Get authenticated user from session cookies
+    const user = await getAuthenticatedUser();
+    const userId = user.uid;
     
     // Use Admin SDK batch for better reliability
     const batch = adminDb.batch();
@@ -266,10 +267,10 @@ export async function markNotificationsAsRead(idToken: string, notificationIds: 
 }
 
 
-export async function getActiveFeedbackFormForUser(idToken: string): Promise<FeedbackForm | null> {
-    // Verify the ID token and extract the user ID
-    const decodedToken = await verifyClientIdToken(idToken);
-    const userId = decodedToken.uid;
+export async function getActiveFeedbackFormForUser(): Promise<FeedbackForm | null> {
+    // Get authenticated user from session cookies
+    const user = await getAuthenticatedUser();
+    const userId = user.uid;
     
     // Use Admin SDK to bypass Firestore rules (server-side only)
     const activeFormsSnap = await adminDb.collection('feedbackForms')
@@ -305,13 +306,12 @@ export async function getActiveFeedbackFormForUser(idToken: string): Promise<Fee
 }
 
 export async function submitFeedbackResponse(
-    idToken: string,
     formId: string,
     answers: Record<string, any>
 ): Promise<{ success: boolean, message: string }> {
-    // Verify the ID token and extract the user ID
-    const decodedToken = await verifyClientIdToken(idToken);
-    const userId = decodedToken.uid;
+    // Get authenticated user from session cookies
+    const user = await getAuthenticatedUser();
+    const userId = user.uid;
     
     try {
         // Use Admin SDK for transaction
@@ -349,10 +349,10 @@ export async function getCategories(): Promise<ProductCategory[]> {
 }
 
 // User function - gets user's own orders with ID token verification
-export async function getOrders(idToken: string): Promise<Order[]> {
-    // Verify the ID token and extract the user ID
-    const decodedToken = await verifyClientIdToken(idToken);
-    const userId = decodedToken.uid;
+export async function getOrders(): Promise<Order[]> {
+    // Get authenticated user from session cookies
+    const user = await getAuthenticatedUser();
+    const userId = user.uid;
     
     const ordersSnapshot = await adminDb.collection('orders')
         .where('userId', '==', userId)
@@ -372,10 +372,10 @@ export async function getOrders(idToken: string): Promise<Order[]> {
     return orders;
 }
 
-export async function getCashbackTransactions(idToken: string): Promise<CashbackTransaction[]> {
-    // Verify the ID token and extract the user ID
-    const decodedToken = await verifyClientIdToken(idToken);
-    const userId = decodedToken.uid;
+export async function getCashbackTransactions(): Promise<CashbackTransaction[]> {
+    // Get authenticated user from session cookies
+    const user = await getAuthenticatedUser();
+    const userId = user.uid;
     
     // Use Admin SDK to bypass Firestore rules (server-side only)
     const transactionsSnapshot = await adminDb.collection('cashbackTransactions')
@@ -390,14 +390,13 @@ export async function getCashbackTransactions(idToken: string): Promise<Cashback
 }
 
 export async function placeOrder(
-    idToken: string,
     productId: string,
     formData: { userName: string; userEmail: string; deliveryPhoneNumber: string },
     clientInfo: { deviceInfo: DeviceInfo, geoInfo: GeoInfo }
 ) {
-    // Verify the ID token and extract the user ID
-    const decodedToken = await verifyClientIdToken(idToken);
-    const userId = decodedToken.uid;
+    // Get authenticated user from session cookies
+    const user = await getAuthenticatedUser();
+    const userId = user.uid;
     
     try {
         // Use Admin SDK transaction for atomic balance checking and order creation
@@ -500,10 +499,10 @@ export async function sendVerificationEmail(): Promise<{ success: boolean; error
 }
 
 
-export async function submitKycData(idToken: string, data: Omit<KycData, 'status' | 'submittedAt'>): Promise<{ success: boolean; error?: string }> {
-    // Verify the ID token and extract the user ID
-    const decodedToken = await verifyClientIdToken(idToken);
-    const userId = decodedToken.uid;
+export async function submitKycData(data: Omit<KycData, 'status' | 'submittedAt'>): Promise<{ success: boolean; error?: string }> {
+    // Get authenticated user from session cookies
+    const user = await getAuthenticatedUser();
+    const userId = user.uid;
     
     try {
         const kycData: KycData = {
@@ -518,10 +517,10 @@ export async function submitKycData(idToken: string, data: Omit<KycData, 'status
     }
 }
 
-export async function submitAddressData(idToken: string, data: Omit<AddressData, 'status' | 'submittedAt'>): Promise<{ success: boolean; error?: string }> {
-    // Verify the ID token and extract the user ID
-    const decodedToken = await verifyClientIdToken(idToken);
-    const userId = decodedToken.uid;
+export async function submitAddressData(data: Omit<AddressData, 'status' | 'submittedAt'>): Promise<{ success: boolean; error?: string }> {
+    // Get authenticated user from session cookies
+    const user = await getAuthenticatedUser();
+    const userId = user.uid;
     
     try {
         const addressData: AddressData = {
@@ -536,10 +535,10 @@ export async function submitAddressData(idToken: string, data: Omit<AddressData,
     }
 }
 
-export async function updateUserPhoneNumber(idToken: string, phoneNumber: string): Promise<{ success: boolean; error?: string }> {
-    // Verify the ID token and extract the user ID
-    const decodedToken = await verifyClientIdToken(idToken);
-    const userId = decodedToken.uid;
+export async function updateUserPhoneNumber(phoneNumber: string): Promise<{ success: boolean; error?: string }> {
+    // Get authenticated user from session cookies
+    const user = await getAuthenticatedUser();
+    const userId = user.uid;
     
     try {
         await adminDb.collection('users').doc(userId).update({ 
@@ -553,10 +552,10 @@ export async function updateUserPhoneNumber(idToken: string, phoneNumber: string
 }
 
 // Admin function - allows admin to update any user's phone number
-export async function adminUpdateUserPhoneNumber(adminIdToken: string, targetUserId: string, phoneNumber: string): Promise<{ success: boolean; error?: string }> {
-    // Verify the admin ID token
-    const decodedToken = await verifyClientIdToken(adminIdToken);
-    if (!decodedToken.admin) {
+export async function adminUpdateUserPhoneNumber(targetUserId: string, phoneNumber: string): Promise<{ success: boolean; error?: string }> {
+    // Get authenticated user from session cookies and verify admin
+    const user = await getAuthenticatedUser();
+    if (!user.customClaims?.admin) {
         return { success: false, error: 'Unauthorized: Admin access required' };
     }
     
@@ -571,10 +570,10 @@ export async function adminUpdateUserPhoneNumber(adminIdToken: string, targetUse
     }
 }
 
-export async function getUserBalance(idToken: string) {
-    // Verify the ID token and extract the user ID
-    const decodedToken = await verifyClientIdToken(idToken);
-    const userId = decodedToken.uid;
+export async function getUserBalance() {
+    // Get authenticated user from session cookies
+    const user = await getAuthenticatedUser();
+    const userId = user.uid;
     
     // Use Admin SDK to bypass Firestore rules (server-side only)
     const [transactionsSnap, withdrawalsSnap, ordersSnap] = await Promise.all([
@@ -611,12 +610,11 @@ export async function getUserBalance(idToken: string) {
     };
 }
 export async function requestWithdrawal(
-    idToken: string, 
     payload: Omit<Withdrawal, 'id' | 'requestedAt' | 'userId'>
 ) {
-    // Verify the ID token and extract the user ID
-    const decodedToken = await verifyClientIdToken(idToken);
-    const userId = decodedToken.uid;
+    // Get authenticated user from session cookies
+    const user = await getAuthenticatedUser();
+    const userId = user.uid;
     
     try {
         // Use Admin SDK for transaction
@@ -686,10 +684,10 @@ export async function getTradingAccounts(): Promise<TradingAccount[]> {
 }
 
 // User function - gets trading accounts for specific user
-export async function getUserTradingAccounts(idToken: string): Promise<TradingAccount[]> {
-  // Verify the ID token and extract the user ID
-  const decodedToken = await verifyClientIdToken(idToken);
-  const userId = decodedToken.uid;
+export async function getUserTradingAccounts(): Promise<TradingAccount[]> {
+  // Get authenticated user from session cookies
+  const user = await getAuthenticatedUser();
+  const userId = user.uid;
   
   // Use Admin SDK to bypass Firestore rules (server-side only)
   const accountsSnapshot = await adminDb.collection('tradingAccounts')
@@ -709,10 +707,10 @@ export async function getUserTradingAccounts(idToken: string): Promise<TradingAc
 }
 
 // User function - gets withdrawals for specific user
-export async function getUserWithdrawals(idToken: string): Promise<Withdrawal[]> {
-  // Verify the ID token and extract the user ID
-  const decodedToken = await verifyClientIdToken(idToken);
-  const userId = decodedToken.uid;
+export async function getUserWithdrawals(): Promise<Withdrawal[]> {
+  // Get authenticated user from session cookies
+  const user = await getAuthenticatedUser();
+  const userId = user.uid;
   
   // Use Admin SDK to bypass Firestore rules (server-side only)
   const withdrawalsSnapshot = await adminDb.collection('withdrawals')
@@ -733,10 +731,10 @@ export async function getUserWithdrawals(idToken: string): Promise<Withdrawal[]>
 }
 
 // Admin function - gets dashboard statistics
-export async function getAdminDashboardStats(idToken: string) {
-  // Verify admin token
-  const decodedToken = await verifyClientIdToken(idToken);
-  if (!decodedToken.admin) {
+export async function getAdminDashboardStats() {
+  // Get authenticated user from session cookies and verify admin
+  const user = await getAuthenticatedUser();
+  if (!user.customClaims?.admin) {
     throw new Error('Unauthorized: Admin access required');
   }
   
@@ -773,10 +771,10 @@ export async function getAdminDashboardStats(idToken: string) {
 }
 
 // User function - gets referral data for specific user
-export async function getUserReferralData(idToken: string) {
-  // Verify the ID token and extract the user ID
-  const decodedToken = await verifyClientIdToken(idToken);
-  const userId = decodedToken.uid;
+export async function getUserReferralData() {
+  // Get authenticated user from session cookies
+  const user = await getAuthenticatedUser();
+  const userId = user.uid;
   
   // Get user profile
   const userDoc = await adminDb.collection('users').doc(userId).get();
@@ -844,14 +842,13 @@ export async function getEnabledOffers() {
 
 // User function - submits trading account for review
 export async function submitTradingAccount(
-  idToken: string,
   brokerId: string,
   brokerName: string,
   accountNumber: string
 ): Promise<{ success: boolean; message: string }> {
-  // Verify the ID token and extract the user ID
-  const decodedToken = await verifyClientIdToken(idToken);
-  const userId = decodedToken.uid;
+  // Get authenticated user from session cookies
+  const user = await getAuthenticatedUser();
+  const userId = user.uid;
   
   // Normalize account number
   const normalizedAccountNumber = accountNumber.trim();
