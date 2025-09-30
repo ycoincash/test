@@ -64,10 +64,18 @@ function NotificationBell() {
         if (!user) return;
         
         const fetchNotifications = async () => {
-            const idToken = await getCurrentUserIdToken();
-            const data = await getNotificationsForUser(idToken);
-            setNotifications(data);
-            setUnreadCount(data.filter(n => !n.isRead).length);
+            try {
+                const idToken = await getCurrentUserIdToken();
+                const data = await getNotificationsForUser(idToken);
+                if (data && Array.isArray(data)) {
+                    setNotifications(data);
+                    setUnreadCount(data.filter(n => !n.isRead).length);
+                }
+            } catch (error) {
+                console.error('Error fetching notifications:', error);
+                setNotifications([]);
+                setUnreadCount(0);
+            }
         };
         fetchNotifications();
         
