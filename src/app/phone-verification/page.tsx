@@ -9,7 +9,9 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import PhoneInput, { isPossiblePhoneNumber } from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import { useToast } from '@/hooks/use-toast';
-import { updateUserPhoneNumber } from '../actions';
+import { updateUserPhoneNumber, adminUpdateUserPhoneNumber } from '../actions';
+import { useAuthContext } from '@/hooks/useAuthContext';
+import { getCurrentUserIdToken } from '@/lib/client-auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 // Define a custom labels object for react-phone-number-input
@@ -19,33 +21,51 @@ function PhoneVerificationForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { toast } = useToast();
+    const { user } = useAuthContext();
 
     const [phoneNumber, setPhoneNumber] = useState<string | undefined>();
     const [isLoading, setIsLoading] = useState(false);
-    const userId = searchParams.get('userId');
+    const targetUserId = searchParams.get('userId');
+    const isAdminMode = targetUserId && targetUserId !== user?.uid;
     
     useEffect(() => {
-        if (!userId) {
+        if (!targetUserId && !user) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'جلسة غير صالحة. يرجى تسجيل الدخول.' });
             router.push('/login');
         }
-    }, [userId, router, toast]);
+    }, [targetUserId, user, router, toast]);
 
     const handleSave = async () => {
-        if (!userId) return;
-
         if (!phoneNumber || !isPossiblePhoneNumber(phoneNumber)) {
             toast({ variant: 'destructive', title: 'رقم هاتف غير صالح', description: 'الرجاء إدخال رقم هاتف صحيح.' });
             return;
         }
 
         setIsLoading(true);
-        const result = await updateUserPhoneNumber(userId, phoneNumber);
-        if (result.success) {
-            toast({ type: 'success', title: 'نجاح', description: 'تم حفظ رقم الهاتف.' });
-            router.push('/dashboard');
-        } else {
-            toast({ variant: 'destructive', title: 'خطأ', description: result.error || 'فشل حفظ رقم الهاتف.' });
+        try {
+            const idToken = await getCurrentUserIdToken();
+            let result;
+            
+            if (isAdminMode && targetUserId) {
+                // Admin updating another user's phone
+                result = await adminUpdateUserPhoneNumber(idToken, targetUserId, phoneNumber);
+            } else {
+                // User updating their own phone
+                result = await updateUserPhoneNumber(idToken, phoneNumber);
+            }
+            
+            if (result.success) {
+                toast({ title: 'نجاح', description: 'تم حفظ رقم الهاتف.' });
+                if (isAdminMode) {
+                    router.push('/admin/users');
+                } else {
+                    router.push('/dashboard');
+                }
+            } else {
+                toast({ variant: 'destructive', title: 'خطأ', description: result.error || 'فشل حفظ رقم الهاتف.' });
+            }
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل المصادقة. يرجى تسجيل الدخول مرة أخرى.' });
         }
         setIsLoading(false);
     };
@@ -55,7 +75,7 @@ function PhoneVerificationForm() {
         router.push('/dashboard');
     };
 
-    if (!userId) {
+    if (!targetUserId && !user) {
         return (
              <div className="flex items-center justify-center min-h-screen">
                 <Loader2 className="h-8 w-8 animate-spin" />

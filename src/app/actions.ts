@@ -488,6 +488,25 @@ export async function updateUserPhoneNumber(idToken: string, phoneNumber: string
     }
 }
 
+// Admin function - allows admin to update any user's phone number
+export async function adminUpdateUserPhoneNumber(adminIdToken: string, targetUserId: string, phoneNumber: string): Promise<{ success: boolean; error?: string }> {
+    // Verify the admin ID token
+    const decodedToken = await verifyClientIdToken(adminIdToken);
+    if (!decodedToken.admin) {
+        return { success: false, error: 'Unauthorized: Admin access required' };
+    }
+    
+    try {
+        await adminDb.collection('users').doc(targetUserId).update({ 
+            phoneNumber: phoneNumber,
+            phoneNumberVerified: true // Admin verified
+        });
+        return { success: true };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+}
+
 export async function getUserBalance(idToken: string) {
     // Verify the ID token and extract the user ID
     const decodedToken = await verifyClientIdToken(idToken);
