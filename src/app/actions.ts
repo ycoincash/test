@@ -7,6 +7,7 @@ import { calculateCashback } from "@/ai/flows/calculate-cashback";
 import type { CalculateCashbackInput, CalculateCashbackOutput } from "@/ai/flows/calculate-cashback";
 import { auth, db } from "@/lib/firebase/config";
 import { adminDb } from '@/lib/firebase/admin-config';
+import { FieldValue } from 'firebase-admin/firestore';
 import { verifyClientIdToken } from '@/lib/auth-helpers';
 import * as admin from 'firebase-admin';
 import { createUserWithEmailAndPassword, signOut, sendPasswordResetEmail, deleteUser } from "firebase/auth";
@@ -320,7 +321,7 @@ export async function submitFeedbackResponse(
             };
 
             transaction.set(responseRef, responsePayload);
-            transaction.update(formRef, { responseCount: adminDb.FieldValue.increment(1) });
+            transaction.update(formRef, { responseCount: FieldValue.increment(1) });
         });
 
         return { success: true, message: "شكرا لملاحظاتك!" };

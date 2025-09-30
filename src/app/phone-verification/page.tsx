@@ -26,7 +26,8 @@ function PhoneVerificationForm() {
     const [phoneNumber, setPhoneNumber] = useState<string | undefined>();
     const [isLoading, setIsLoading] = useState(false);
     const targetUserId = searchParams.get('userId');
-    const isAdminMode = targetUserId && targetUserId !== user?.uid;
+    // Only admin mode if user is actually an admin AND targetUserId differs from current user
+    const isAdminMode = user?.profile?.admin && targetUserId && targetUserId !== user?.uid;
     
     useEffect(() => {
         if (!targetUserId && !user) {
