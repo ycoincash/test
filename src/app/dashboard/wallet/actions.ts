@@ -2,9 +2,13 @@
 'use server';
 
 import { adminDb } from '@/lib/firebase/admin-config';
+import { verifyClientIdToken } from '@/lib/auth-helpers';
 import type { Withdrawal } from '@/types';
 
-export async function getWalletHistory(userId: string): Promise<{ withdrawals: Withdrawal[] }> {
+export async function getWalletHistory(idToken: string): Promise<{ withdrawals: Withdrawal[] }> {
+    // Verify the ID token and extract the user ID
+    const decodedToken = await verifyClientIdToken(idToken);
+    const userId = decodedToken.uid;
     try {
         // Use Admin SDK to bypass Firestore rules (server-side only)
         const withdrawalsSnap = await adminDb.collection('withdrawals')

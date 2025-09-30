@@ -7,6 +7,7 @@ import { calculateCashback } from "@/ai/flows/calculate-cashback";
 import type { CalculateCashbackInput, CalculateCashbackOutput } from "@/ai/flows/calculate-cashback";
 import { auth, db } from "@/lib/firebase/config";
 import { adminDb } from '@/lib/firebase/admin-config';
+import { verifyClientIdToken } from '@/lib/auth-helpers';
 import * as admin from 'firebase-admin';
 import { createUserWithEmailAndPassword, signOut, sendPasswordResetEmail, deleteUser } from "firebase/auth";
 import { doc, setDoc, Timestamp, getDocs, collection, query, where, runTransaction, arrayUnion, writeBatch, increment, getDoc, updateDoc, addDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
@@ -205,7 +206,11 @@ export async function getClientLevels(): Promise<ClientLevel[]> {
     return levelsArray;
 }
 
-export async function getNotificationsForUser(userId: string): Promise<Notification[]> {
+export async function getNotificationsForUser(idToken: string): Promise<Notification[]> {
+    // Verify the ID token and extract the user ID
+    const decodedToken = await verifyClientIdToken(idToken);
+    const userId = decodedToken.uid;
+    
     // Use Admin SDK to bypass Firestore rules (server-side only)
     const querySnapshot = await adminDb.collection('notifications')
         .where('userId', '==', userId)
@@ -235,7 +240,11 @@ export async function markNotificationsAsRead(notificationIds: string[]) {
 }
 
 
-export async function getActiveFeedbackFormForUser(userId: string): Promise<FeedbackForm | null> {
+export async function getActiveFeedbackFormForUser(idToken: string): Promise<FeedbackForm | null> {
+    // Verify the ID token and extract the user ID
+    const decodedToken = await verifyClientIdToken(idToken);
+    const userId = decodedToken.uid;
+    
     // Use Admin SDK to bypass Firestore rules (server-side only)
     const activeFormsSnap = await adminDb.collection('feedbackForms')
         .where('status', '==', 'active')
@@ -269,24 +278,31 @@ export async function getActiveFeedbackFormForUser(userId: string): Promise<Feed
 }
 
 export async function submitFeedbackResponse(
-    userId: string,
+    idToken: string,
     formId: string,
     answers: Record<string, any>
 ): Promise<{ success: boolean, message: string }> {
+    // Verify the ID token and extract the user ID
+    const decodedToken = await verifyClientIdToken(idToken);
+    const userId = decodedToken.uid;
+    
     try {
-        await runTransaction(db, async (transaction) => {
-            const formRef = doc(db, 'feedbackForms', formId);
-            const responseRef = doc(collection(db, 'feedbackResponses'));
+        // Use Admin SDK for transaction
+        const db = adminDb;
+        
+        await db.runTransaction(async (transaction) => {
+            const formRef = db.collection('feedbackForms').doc(formId);
+            const responseRef = db.collection('feedbackResponses').doc();
 
-            const responsePayload: Omit<FeedbackResponse, 'id'> = {
+            const responsePayload = {
                 formId,
                 userId,
                 submittedAt: new Date(),
                 answers,
             };
 
-            transaction.set(responseRef, { ...responsePayload, submittedAt: Timestamp.now()});
-            transaction.update(formRef, { responseCount: increment(1) });
+            transaction.set(responseRef, responsePayload);
+            transaction.update(formRef, { responseCount: adminDb.FieldValue.increment(1) });
         });
 
         return { success: true, message: "شكرا لملاحظاتك!" };
@@ -323,7 +339,11 @@ export async function getOrders(userId: string): Promise<Order[]> {
     return orders;
 }
 
-export async function getCashbackTransactions(userId: string): Promise<CashbackTransaction[]> {
+export async function getCashbackTransactions(idToken: string): Promise<CashbackTransaction[]> {
+    // Verify the ID token and extract the user ID
+    const decodedToken = await verifyClientIdToken(idToken);
+    const userId = decodedToken.uid;
+    
     // Use Admin SDK to bypass Firestore rules (server-side only)
     const transactionsSnapshot = await adminDb.collection('cashbackTransactions')
         .where('userId', '==', userId)
@@ -441,7 +461,11 @@ export async function updateUserPhoneNumber(userId: string, phoneNumber: string)
     }
 }
 
-export async function getUserBalance(userId: string) {
+export async function getUserBalance(idToken: string) {
+    // Verify the ID token and extract the user ID
+    const decodedToken = await verifyClientIdToken(idToken);
+    const userId = decodedToken.uid;
+    
     // Use Admin SDK to bypass Firestore rules (server-side only)
     const [transactionsSnap, withdrawalsSnap, ordersSnap] = await Promise.all([
         adminDb.collection('cashbackTransactions').where('userId', '==', userId).get(),
@@ -517,7 +541,11 @@ export async function getTradingAccounts(): Promise<TradingAccount[]> {
 }
 
 // User function - gets trading accounts for specific user
-export async function getUserTradingAccounts(userId: string): Promise<TradingAccount[]> {
+export async function getUserTradingAccounts(idToken: string): Promise<TradingAccount[]> {
+  // Verify the ID token and extract the user ID
+  const decodedToken = await verifyClientIdToken(idToken);
+  const userId = decodedToken.uid;
+  
   // Use Admin SDK to bypass Firestore rules (server-side only)
   const accountsSnapshot = await adminDb.collection('tradingAccounts')
     .where('userId', '==', userId)
