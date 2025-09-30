@@ -6,6 +6,27 @@ import * as admin from 'firebase-admin';
 import type { Order, Notification } from '@/types';
 import { awardReferralCommission, clawbackReferralCommission, createNotification } from '../actions';
 
+export async function getAllOrders(): Promise<Order[]> {
+    try {
+        const ordersSnapshot = await adminDb.collection('orders').get();
+        const orders: Order[] = ordersSnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                createdAt: data.createdAt?.toDate() || new Date(),
+            } as Order;
+        });
+        
+        // Sort by createdAt descending (newest first) on the client side
+        orders.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        
+        return orders;
+    } catch (error) {
+        console.error("Error fetching all orders:", error);
+        throw new Error("Failed to fetch orders");
+    }
+}
 
 export async function updateOrderStatus(orderId: string, status: Order['status']) {
     try {

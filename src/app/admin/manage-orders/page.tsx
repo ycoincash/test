@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { updateOrderStatus } from "./actions";
-import { getOrders } from "@/app/actions";
+import { updateOrderStatus, getAllOrders } from "./actions";
 import type { Order } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { DataTable } from "@/components/data-table/data-table";
@@ -19,7 +18,7 @@ export default function ManageOrdersPage() {
     const fetchOrders = async () => {
         setIsLoading(true);
         try {
-            const data = await getOrders();
+            const data = await getAllOrders();
             setOrders(data);
         } catch (error) {
             toast({ variant: "destructive", title: "خطأ", description: "تعذر جلب الطلبات." });
