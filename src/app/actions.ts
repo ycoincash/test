@@ -236,8 +236,10 @@ export async function markNotificationsAsRead(notificationIds: string[]) {
 
 
 export async function getActiveFeedbackFormForUser(userId: string): Promise<FeedbackForm | null> {
-    const activeFormsQuery = query(collection(db, 'feedbackForms'), where('status', '==', 'active'));
-    const activeFormsSnap = await getDocs(activeFormsQuery);
+    // Use Admin SDK to bypass Firestore rules (server-side only)
+    const activeFormsSnap = await adminDb.collection('feedbackForms')
+        .where('status', '==', 'active')
+        .get();
     if (activeFormsSnap.empty) {
         return null;
     }
@@ -247,7 +249,7 @@ export async function getActiveFeedbackFormForUser(userId: string): Promise<Feed
         return {
             id: doc.id,
             ...data,
-            createdAt: safeToDate(data.createdAt) || new Date(),
+            createdAt: data.createdAt?.toDate() || new Date(),
         } as FeedbackForm;
     });
     
@@ -322,11 +324,13 @@ export async function getOrders(userId: string): Promise<Order[]> {
 }
 
 export async function getCashbackTransactions(userId: string): Promise<CashbackTransaction[]> {
-    const transactionsQuery = query(collection(db, "cashbackTransactions"), where("userId", "==", userId));
-    const transactionsSnapshot = await getDocs(transactionsQuery);
+    // Use Admin SDK to bypass Firestore rules (server-side only)
+    const transactionsSnapshot = await adminDb.collection('cashbackTransactions')
+        .where('userId', '==', userId)
+        .get();
     const userTransactions = transactionsSnapshot.docs.map(doc => {
         const data = doc.data();
-        return { id: doc.id, ...data, date: (data.date as Timestamp).toDate() } as CashbackTransaction;
+        return { id: doc.id, ...data, date: data.date?.toDate() || new Date() } as CashbackTransaction;
     });
     userTransactions.sort((a, b) => b.date.getTime() - a.date.getTime());
     return userTransactions;
