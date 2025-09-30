@@ -40,8 +40,8 @@ export async function logUserActivity(
       userAgent: clientInfo.deviceInfo.browser,
       device: clientInfo.deviceInfo,
       geo: {
-        country: clientInfo.geoInfo.country,
-        city: clientInfo.geoInfo.city,
+        country: clientInfo.geoInfo.country || 'Unknown',
+        city: clientInfo.geoInfo.city || 'Unknown',
       },
       details,
     };

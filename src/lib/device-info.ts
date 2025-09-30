@@ -48,14 +48,13 @@ async function getGeoInfo(): Promise<GeoInfo> {
         const data = await response.json();
         
         return {
-            ip: 'client',
+            ip: data.ip || 'client',
             country: data.country || 'SA',
-            region: undefined,
-            city: undefined,
+            city: data.city || 'Unknown',
         };
     } catch (error) {
         console.warn('Could not fetch geo data:', error);
-        return { ip: 'unknown', country: 'SA' };
+        return { ip: 'unknown', country: 'SA', city: 'Unknown' };
     }
 }
 

@@ -1,15 +1,16 @@
 import { NextResponse } from 'next/server';
-import { getCountryFromHeaders } from '@/lib/server-geo';
+import { getGeoFromHeaders } from '@/lib/server-geo';
 
 export async function GET() {
     try {
-        const country = await getCountryFromHeaders();
+        const geoData = await getGeoFromHeaders();
         
         return NextResponse.json({ 
-            country: country || 'SA'
+            country: geoData.country || 'SA',
+            ip: geoData.ip || 'unknown'
         });
     } catch (error) {
         console.error('Error in /api/geo:', error);
-        return NextResponse.json({ country: 'SA' }, { status: 200 });
+        return NextResponse.json({ country: 'SA', ip: 'unknown' }, { status: 200 });
     }
 }

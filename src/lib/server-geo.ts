@@ -41,7 +41,7 @@ export async function getCountryFromHeaders(): Promise<string | null> {
     }
 }
 
-export async function getGeoFromHeaders(): Promise<{ country: string | null; ip: string | null }> {
+export async function getGeoFromHeaders(): Promise<{ country: string | null; ip: string | null; city?: string }> {
     try {
         const headersList = await headers();
         const forwarded = headersList.get('x-forwarded-for');
@@ -50,35 +50,48 @@ export async function getGeoFromHeaders(): Promise<{ country: string | null; ip:
         const ip = forwarded ? forwarded.split(',')[0].trim() : realIp || null;
         
         if (!ip || ip === 'localhost' || ip === '127.0.0.1' || ip.startsWith('192.168.') || ip.startsWith('10.')) {
+            console.log('Private/local IP detected, skipping geo lookup');
             return { country: null, ip: null };
         }
 
         const token = process.env.IPINFO_TOKEN;
         
         if (token) {
-            const response = await fetch(`https://ipinfo.io/${ip}?token=${token}`, {
-                next: { revalidate: 3600 }
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                return {
-                    country: data.country?.toUpperCase() || null,
-                    ip: data.ip || ip
-                };
+            try {
+                const response = await fetch(`https://ipinfo.io/${ip}?token=${token}`, {
+                    next: { revalidate: 3600 }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('IPinfo data:', { ip, country: data.country, city: data.city });
+                    return {
+                        country: data.country?.toUpperCase() || null,
+                        city: data.city || undefined,
+                        ip: data.ip || ip
+                    };
+                }
+            } catch (err) {
+                console.error('IPinfo fetch error:', err);
             }
         }
         
-        const fallbackResponse = await fetch(`https://ipapi.co/${ip}/json/`, {
-            next: { revalidate: 3600 }
-        });
-        
-        if (fallbackResponse.ok) {
-            const data = await fallbackResponse.json();
-            return {
-                country: data.country_code?.toUpperCase() || null,
-                ip: data.ip || ip
-            };
+        try {
+            const fallbackResponse = await fetch(`https://ipapi.co/${ip}/json/`, {
+                next: { revalidate: 3600 }
+            });
+            
+            if (fallbackResponse.ok) {
+                const data = await fallbackResponse.json();
+                console.log('IPapi data:', { ip, country: data.country_code, city: data.city });
+                return {
+                    country: data.country_code?.toUpperCase() || null,
+                    city: data.city || undefined,
+                    ip: data.ip || ip
+                };
+            }
+        } catch (err) {
+            console.error('IPapi fetch error:', err);
         }
         
         return { country: null, ip };
