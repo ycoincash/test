@@ -89,11 +89,11 @@ export default function LoginPage() {
         await logUserActivity(user.uid, 'login', clientInfo, { method: userCredential.providerId || 'email' });
     }
 
-    // Set secure HTTP-only cookie via middleware-intercepted endpoint
+    // Set secure HTTP-only cookie via middleware-managed endpoint
     try {
         const idToken = await user.getIdToken();
-        const response = await fetch('/api/auth/session', {
-            method: 'GET',
+        const response = await fetch('/api/login', {
+            method: 'POST',
             headers: { 
                 'Authorization': `Bearer ${idToken}`,
             },

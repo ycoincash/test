@@ -146,21 +146,10 @@ export async function handleRegisterUser(formData: { name: string, email: string
 
 export async function handleLogout() {
     try {
-        // Clear HTTP-only auth cookies by setting them to expired
-        const { cookies: nextCookies } = await import('next/headers');
-        const cookieStore = await nextCookies();
-        const config = (await import('@/lib/firebase/auth-edge-config')).getServerConfig();
-        
-        cookieStore.set(config.cookieName, '', {
-            ...config.cookieSerializeOptions,
-            maxAge: 0,
-        });
-        
-        cookieStore.set(`${config.cookieName}.sig`, '', {
-            ...config.cookieSerializeOptions,
-            maxAge: 0,
-        });
-        
+        // Note: This is a server action that tells the client to call /api/logout
+        // The actual cookie clearing is handled by the authMiddleware
+        // This function exists to maintain compatibility with existing code
+        // The client should call /api/logout endpoint which the middleware manages
         return { success: true };
     } catch (error) {
         console.error("Logout Error: ", error);

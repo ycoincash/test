@@ -6,7 +6,8 @@ export async function middleware(request: NextRequest) {
   const config = getServerConfig();
 
   return authMiddleware(request, {
-    loginPath: '/api/auth/session',
+    loginPath: '/api/login',
+    logoutPath: '/api/logout',
     apiKey: config.apiKey,
     cookieName: config.cookieName,
     cookieSignatureKeys: config.cookieSignatureKeys,
@@ -35,8 +36,7 @@ export const config = {
     '/dashboard/:path*',
     '/admin/:path*',
     '/phone-verification',
-    '/api/auth/session',
-    // Note: /api/auth/logout is excluded to prevent CSRF bypass
-    // Logout route handles CSRF validation and cookie clearing itself
+    '/api/login',
+    '/api/logout',
   ],
 };

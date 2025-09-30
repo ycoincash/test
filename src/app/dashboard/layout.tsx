@@ -179,12 +179,21 @@ function SettingsSidebar() {
     }
     
     const onLogout = async () => {
-        const { success, error } = await handleLogout();
-        if (success) {
-            toast({ title: "تم تسجيل الخروج", description: "لقد قمت بتسجيل الخروج بنجاح."});
-            router.push('/login');
-        } else {
-            toast({ variant: 'destructive', title: "خطأ", description: error });
+        try {
+            // Call middleware-managed logout endpoint to clear auth cookies
+            const response = await fetch('/api/logout', {
+                method: 'POST',
+            });
+            
+            if (response.ok) {
+                toast({ title: "تم تسجيل الخروج", description: "لقد قمت بتسجيل الخروج بنجاح."});
+                router.push('/login');
+            } else {
+                throw new Error('Logout failed');
+            }
+        } catch (error) {
+            console.error('Logout error:', error);
+            toast({ variant: 'destructive', title: "خطأ", description: "Failed to log out." });
         }
     };
     
@@ -365,12 +374,21 @@ function DesktopSidebar() {
     const { toast } = useToast();
 
     const onLogout = async () => {
-        const { success, error } = await handleLogout();
-        if (success) {
-            toast({ title: "تم تسجيل الخروج", description: "لقد قمت بتسجيل الخروج بنجاح."});
-            router.push('/login');
-        } else {
-            toast({ variant: 'destructive', title: "خطأ", description: error });
+        try {
+            // Call middleware-managed logout endpoint to clear auth cookies
+            const response = await fetch('/api/logout', {
+                method: 'POST',
+            });
+            
+            if (response.ok) {
+                toast({ title: "تم تسجيل الخروج", description: "لقد قمت بتسجيل الخروج بنجاح."});
+                router.push('/login');
+            } else {
+                throw new Error('Logout failed');
+            }
+        } catch (error) {
+            console.error('Logout error:', error);
+            toast({ variant: 'destructive', title: "خطأ", description: "Failed to log out." });
         }
     };
     
