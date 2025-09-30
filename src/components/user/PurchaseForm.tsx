@@ -17,7 +17,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuthContext } from "@/hooks/useAuthContext";
 import { placeOrder } from "@/app/actions";
 import { getClientSessionInfo } from "@/lib/device-info";
-import { getCurrentUserIdToken } from "@/lib/client-auth";
 
 
 const purchaseSchema = z.object({
@@ -47,9 +46,8 @@ export function PurchaseForm({ product, isOpen, onClose }: { product: Product; i
         setIsSubmitting(true);
         
         try {
-            const idToken = await getCurrentUserIdToken();
             const clientInfo = await getClientSessionInfo();
-            const result = await placeOrder(idToken, product.id, data, clientInfo);
+            const result = await placeOrder(product.id, data, clientInfo);
 
             if (result.success) {
                 toast({ title: "تم بنجاح!", description: result.message });

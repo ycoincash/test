@@ -13,7 +13,6 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Image from "next/image";
 import { getUserTradingAccounts, getCashbackTransactions } from "@/app/actions";
-import { getCurrentUserIdToken } from "@/lib/client-auth";
 import { cn } from "@/lib/utils";
 
 function AccountCard({ account, totalEarned }: { account: TradingAccount, totalEarned: number }) {
@@ -116,10 +115,9 @@ export default function MyAccountsPage() {
             
             setIsLoading(true);
             try {
-                const idToken = await getCurrentUserIdToken();
                 const [fetchedAccounts, userTransactions] = await Promise.all([
-                    getUserTradingAccounts(idToken),
-                    getCashbackTransactions(idToken)
+                    getUserTradingAccounts(),
+                    getCashbackTransactions()
                 ]);
                 
                 const userAccounts = fetchedAccounts;

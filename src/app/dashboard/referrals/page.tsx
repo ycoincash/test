@@ -17,7 +17,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import Link from 'next/link';
 import { getClientLevels, getUserReferralData } from '@/app/actions';
-import { getCurrentUserIdToken } from '@/lib/client-auth';
 import { Progress } from '@/components/ui/progress';
 import { Label } from '@/components/ui/label';
 
@@ -172,10 +171,9 @@ export default function ReferralsPage() {
             setIsLoading(true);
 
             try {
-                const idToken = await getCurrentUserIdToken();
                 const [levelsData, referralData] = await Promise.all([
                     getClientLevels(),
-                    getUserReferralData(idToken)
+                    getUserReferralData()
                 ]);
 
                 setLevels(levelsData);

@@ -8,7 +8,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import type { FeedbackForm, FeedbackQuestion } from '@/types';
 import { useAuthContext } from '@/hooks/useAuthContext';
 import { submitFeedbackResponse } from '@/app/actions';
-import { getCurrentUserIdToken } from '@/lib/client-auth';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Form, FormControl, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Button } from '@/components/ui/button';
@@ -54,8 +53,7 @@ export function UserFeedbackForm({ form: activeForm }: { form: FeedbackForm | nu
 
     const onSubmit = async (data: Record<string, any>) => {
         setIsSubmitting(true);
-        const idToken = await getCurrentUserIdToken();
-        const result = await submitFeedbackResponse(idToken, activeForm.id, data);
+        const result = await submitFeedbackResponse(activeForm.id, data);
         if (result.success) {
             toast({ title: "تم الإرسال!", description: result.message });
             setIsOpen(false);

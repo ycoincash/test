@@ -15,7 +15,6 @@ import { useAuthContext } from '@/hooks/useAuthContext';
 import { db } from '@/lib/firebase/config';
 import { doc, getDoc } from 'firebase/firestore';
 import { submitTradingAccount } from '@/app/actions';
-import { getCurrentUserIdToken } from '@/lib/client-auth';
 import type { Broker } from '@/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Info, Loader2, UserPlus, FileText, Link as LinkIcon, ExternalLink, ArrowLeft } from 'lucide-react';
@@ -113,8 +112,7 @@ export default function BrokerLinkPage() {
     }
     setIsSubmitting(true);
     try {
-      const idToken = await getCurrentUserIdToken();
-      const result = await submitTradingAccount(idToken, brokerId, brokerName, data.accountNumber);
+      const result = await submitTradingAccount(brokerId, brokerName, data.accountNumber);
       
       if (result.success) {
         toast({ title: 'نجاح!', description: result.message });

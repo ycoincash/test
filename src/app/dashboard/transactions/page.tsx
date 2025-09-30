@@ -18,7 +18,6 @@ import {
 import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { getCashbackTransactions } from "@/app/actions";
-import { getCurrentUserIdToken } from "@/lib/client-auth";
 
 export default function TransactionsPage() {
     const { user } = useAuthContext();
@@ -35,8 +34,7 @@ export default function TransactionsPage() {
             
             setIsLoading(true);
             try {
-                const idToken = await getCurrentUserIdToken();
-                const userTransactions = await getCashbackTransactions(idToken);
+                const userTransactions = await getCashbackTransactions();
                 setTransactions(userTransactions);
             } catch (error) {
                 console.error("Error fetching transactions: ", error);

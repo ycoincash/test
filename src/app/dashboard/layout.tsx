@@ -40,7 +40,6 @@ import { AuthGuard } from "@/components/shared/AuthGuard";
 import { useEffect, useState, useCallback } from "react";
 import type { Notification, ClientLevel } from "@/types";
 import { getNotificationsForUser, markNotificationsAsRead, handleLogout, getClientLevels } from "@/app/actions";
-import { getCurrentUserIdToken } from "@/lib/client-auth";
 import { formatDistanceToNow } from "date-fns";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -65,8 +64,7 @@ function NotificationBell() {
         
         const fetchNotifications = async () => {
             try {
-                const idToken = await getCurrentUserIdToken();
-                const data = await getNotificationsForUser(idToken);
+                const data = await getNotificationsForUser();
                 if (data && Array.isArray(data)) {
                     setNotifications(data);
                     setUnreadCount(data.filter(n => !n.isRead).length);
@@ -88,8 +86,7 @@ function NotificationBell() {
     const handleMarkAsRead = async () => {
         const unreadIds = notifications.filter(n => !n.isRead).map(n => n.id);
         if (unreadIds.length > 0) {
-            const idToken = await getCurrentUserIdToken();
-            await markNotificationsAsRead(idToken, unreadIds);
+            await markNotificationsAsRead(unreadIds);
             setNotifications(notifications.map(n => ({ ...n, isRead: true })));
             setUnreadCount(0);
         }

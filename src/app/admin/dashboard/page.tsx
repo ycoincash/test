@@ -9,7 +9,6 @@ import { getWithdrawals } from '@/app/admin/manage-withdrawals/actions';
 import { getUsers } from '@/app/admin/users/actions';
 import { getPendingVerifications } from '../manage-verifications/actions';
 import { getAdminDashboardStats } from '@/app/actions';
-import { getCurrentUserIdToken } from '@/lib/client-auth';
 import type { TradingAccount, UserProfile, Withdrawal, CashbackTransaction, Order } from '@/types';
 import { Loader2, Users, Briefcase, Landmark, ShieldCheck, HandCoins, ShoppingBag, Banknote, DollarSign } from 'lucide-react';
 
@@ -40,7 +39,6 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const idToken = await getCurrentUserIdToken();
         const [
             users, 
             accounts, 
@@ -52,7 +50,7 @@ export default function AdminDashboardPage() {
           getTradingAccounts(),
           getWithdrawals(),
           getPendingVerifications(),
-          getAdminDashboardStats(idToken),
+          getAdminDashboardStats(),
         ]);
         
         const totalUsers = users.length;

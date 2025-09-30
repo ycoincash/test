@@ -11,7 +11,6 @@ import 'react-phone-number-input/style.css';
 import { useToast } from '@/hooks/use-toast';
 import { updateUserPhoneNumber, adminUpdateUserPhoneNumber } from '../actions';
 import { useAuthContext } from '@/hooks/useAuthContext';
-import { getCurrentUserIdToken } from '@/lib/client-auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 // Define a custom labels object for react-phone-number-input
@@ -67,15 +66,14 @@ function PhoneVerificationForm() {
 
         setIsLoading(true);
         try {
-            const idToken = await getCurrentUserIdToken();
             let result;
             
             if (isAdminMode && targetUserId) {
                 // Admin updating another user's phone
-                result = await adminUpdateUserPhoneNumber(idToken, targetUserId, phoneNumber);
+                result = await adminUpdateUserPhoneNumber(targetUserId, phoneNumber);
             } else {
                 // User updating their own phone
-                result = await updateUserPhoneNumber(idToken, phoneNumber);
+                result = await updateUserPhoneNumber(phoneNumber);
             }
             
             if (result.success) {

@@ -40,7 +40,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { getUserBalance, requestWithdrawal, getUserWithdrawals, getUserTradingAccounts } from "@/app/actions";
-import { getCurrentUserIdToken } from "@/lib/client-auth";
 import { getPaymentMethods } from "@/app/admin/manage-payment-methods/actions";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -89,12 +88,11 @@ function WithdrawTabContent() {
         if (user) {
             setIsFetching(true);
             try {
-                const idToken = await getCurrentUserIdToken();
                 const [balanceData, withdrawalsData, adminMethodsData, accountsData] = await Promise.all([
-                    getUserBalance(idToken),
-                    getUserWithdrawals(idToken),
+                    getUserBalance(),
+                    getUserWithdrawals(),
                     getPaymentMethods(),
-                    getUserTradingAccounts(idToken),
+                    getUserTradingAccounts(),
                 ]);
 
                 setAvailableBalance(balanceData.availableBalance);
@@ -222,8 +220,7 @@ function WithdrawTabContent() {
         };
 
         try {
-            const idToken = await getCurrentUserIdToken();
-            const result = await requestWithdrawal(idToken, payload);
+            const result = await requestWithdrawal(payload);
             if (!result.success) {
                 throw new Error(result.message);
             }
