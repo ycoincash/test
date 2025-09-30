@@ -41,7 +41,7 @@ export async function getCountryFromHeaders(): Promise<string | null> {
     }
 }
 
-export async function getGeoFromHeaders(): Promise<{ country: string | null; ip: string | null; city?: string }> {
+export async function getGeoFromHeaders(): Promise<{ country: string | null; ip: string | null; city: string | null; region?: string }> {
     try {
         const headersList = await headers();
         const forwarded = headersList.get('x-forwarded-for');
@@ -51,7 +51,7 @@ export async function getGeoFromHeaders(): Promise<{ country: string | null; ip:
         
         if (!ip || ip === 'localhost' || ip === '127.0.0.1' || ip.startsWith('192.168.') || ip.startsWith('10.')) {
             console.log('Private/local IP detected, skipping geo lookup');
-            return { country: null, ip: null };
+            return { country: null, ip: null, city: null };
         }
 
         const token = process.env.IPINFO_TOKEN;
@@ -64,10 +64,15 @@ export async function getGeoFromHeaders(): Promise<{ country: string | null; ip:
                 
                 if (response.ok) {
                     const data = await response.json();
-                    console.log('IPinfo data:', { ip, country: data.country, city: data.city });
+                    console.log('IPinfo data:', { ip, country: data.country, city: data.city, region: data.region });
+                    
+                    const country = data.country?.toUpperCase() || null;
+                    const city = data.city || null;
+                    
                     return {
-                        country: data.country?.toUpperCase() || null,
-                        city: data.city || undefined,
+                        country: country || (city ? await detectCountryByCity(city) : null),
+                        city: city,
+                        region: data.region || undefined,
                         ip: data.ip || ip
                     };
                 }
@@ -83,10 +88,15 @@ export async function getGeoFromHeaders(): Promise<{ country: string | null; ip:
             
             if (fallbackResponse.ok) {
                 const data = await fallbackResponse.json();
-                console.log('IPapi data:', { ip, country: data.country_code, city: data.city });
+                console.log('IPapi data:', { ip, country: data.country_code, city: data.city, region: data.region });
+                
+                const country = data.country_code?.toUpperCase() || null;
+                const city = data.city || null;
+                
                 return {
-                    country: data.country_code?.toUpperCase() || null,
-                    city: data.city || undefined,
+                    country: country || (city ? await detectCountryByCity(city) : null),
+                    city: city,
+                    region: data.region || undefined,
                     ip: data.ip || ip
                 };
             }
@@ -94,9 +104,35 @@ export async function getGeoFromHeaders(): Promise<{ country: string | null; ip:
             console.error('IPapi fetch error:', err);
         }
         
-        return { country: null, ip };
+        return { country: null, ip, city: null };
     } catch (error) {
         console.error('Error detecting geo from IP:', error);
-        return { country: null, ip: null };
+        return { country: null, ip: null, city: null };
     }
+}
+
+async function detectCountryByCity(city: string): Promise<string | null> {
+    const cityCountryMap: Record<string, string> = {
+        'Cairo': 'EG', 'Alexandria': 'EG', 'Giza': 'EG',
+        'Riyadh': 'SA', 'Jeddah': 'SA', 'Mecca': 'SA', 'Medina': 'SA', 'Dammam': 'SA',
+        'Dubai': 'AE', 'Abu Dhabi': 'AE', 'Sharjah': 'AE',
+        'Kuwait City': 'KW',
+        'Doha': 'QA',
+        'Manama': 'BH',
+        'Muscat': 'OM',
+        'Amman': 'JO',
+        'Beirut': 'LB',
+        'Baghdad': 'IQ',
+        'Damascus': 'SY',
+        'Sana\'a': 'YE', 'Aden': 'YE',
+        'Ramallah': 'PS', 'Gaza': 'PS',
+        'Khartoum': 'SD',
+        'Tunis': 'TN',
+        'Algiers': 'DZ',
+        'Rabat': 'MA', 'Casablanca': 'MA',
+        'Tripoli': 'LY',
+        'Nouakchott': 'MR',
+    };
+    
+    return cityCountryMap[city] || null;
 }

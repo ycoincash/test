@@ -7,10 +7,11 @@ export async function GET() {
         
         return NextResponse.json({ 
             country: geoData.country || 'SA',
+            city: geoData.city || 'Unknown',
             ip: geoData.ip || 'unknown'
         });
     } catch (error) {
         console.error('Error in /api/geo:', error);
-        return NextResponse.json({ country: 'SA', ip: 'unknown' }, { status: 200 });
+        return NextResponse.json({ country: 'SA', city: 'Unknown', ip: 'unknown' }, { status: 200 });
     }
 }

@@ -37,7 +37,7 @@ export async function logUserActivity(
       event,
       timestamp: new Date(),
       ipAddress: clientInfo.geoInfo.ip || 'unknown',
-      userAgent: clientInfo.deviceInfo.browser,
+      userAgent: `${clientInfo.deviceInfo.browser} on ${clientInfo.deviceInfo.os}`,
       device: clientInfo.deviceInfo,
       geo: {
         country: clientInfo.geoInfo.country || 'Unknown',

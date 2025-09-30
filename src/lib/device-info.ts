@@ -50,11 +50,11 @@ async function getGeoInfo(): Promise<GeoInfo> {
         return {
             ip: data.ip || 'client',
             country: data.country || 'SA',
-            city: data.city || 'Unknown',
+            city: data.city && data.city !== 'Unknown' ? data.city : undefined,
         };
     } catch (error) {
         console.warn('Could not fetch geo data:', error);
-        return { ip: 'unknown', country: 'SA', city: 'Unknown' };
+        return { ip: 'unknown', country: 'SA' };
     }
 }
 
