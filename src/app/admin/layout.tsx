@@ -28,6 +28,8 @@ import {
     ShieldCheck,
     Upload,
     BadgePercent,
+    Settings,
+    Activity,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -55,6 +57,8 @@ const navLinks = [
     { href: "/admin/manage-feedback", icon: MessageSquare, label: "إدارة الملاحظات"},
     { href: "/admin/manage-offers", icon: BadgePercent, label: "إدارة العروض" },
     { href: "/admin/manage-banner", icon: GalleryHorizontal, label: "إدارة البانر" },
+    { href: "/admin/manage-contact", icon: Settings, label: "إعدادات الاتصال" },
+    { href: "/admin/security-logs", icon: Activity, label: "سجلات الأمان" },
 ];
 
 const storeLinks = [

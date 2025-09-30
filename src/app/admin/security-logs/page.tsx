@@ -23,9 +23,8 @@ export default function SecurityLogsPage() {
         const fetchLogs = async () => {
             setIsLoading(true);
             try {
-                // const fetchedLogs = await getActivityLogs();
-                // setLogs(fetchedLogs);
-                setLogs([]); // Set logs to empty array to pause feature
+                const fetchedLogs = await getActivityLogs();
+                setLogs(fetchedLogs);
             } catch (error) {
                 console.error("Failed to fetch logs:", error);
                 toast({ variant: 'destructive', title: 'خطأ', description: 'تعذر جلب سجلات النشاط.' });
@@ -34,8 +33,7 @@ export default function SecurityLogsPage() {
             }
         };
 
-        // fetchLogs(); // The action is paused by not calling this function.
-        setIsLoading(false); // Set loading to false to show the empty state.
+        fetchLogs();
     }, [toast]);
 
     const filteredLogs = useMemo(() => {

@@ -24,7 +24,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuthContext } from "@/hooks/useAuthContext";
-import { getAllBlogPosts, addBlogPost, updateBlogPost, deleteBlogPost } from "@/app/actions";
+import { getAllBlogPosts, addBlogPost, updateBlogPost, deleteBlogPost } from "../manage-blog/actions";
 import { PlusCircle, Loader2, Type, Link as LinkIcon, Tag, AlignLeft, FileText } from "lucide-react";
 import type { BlogPost } from "@/types";
 import { DataTable } from "@/components/data-table/data-table";

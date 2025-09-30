@@ -152,3 +152,15 @@ The following Firebase configuration variables must be set in Replit Secrets:
   - Uses FieldValue.increment for stock decrement for better concurrency
   - **Result**: Users can now successfully purchase from store with proper security and no double-spend risk
   - **Status**: Production-ready, architect-approved
+- 2025-09-30: Vercel deployment fixes (COMPLETED)
+  - Created missing `/src/app/admin/manage-blog/columns.tsx` for blog management table
+  - Created missing `/src/app/admin/manage-contact/actions.ts` for contact settings management
+  - Added `ContactSettings` type to `/src/types/index.ts`
+  - **Result**: Vercel production build now succeeds, all module imports resolved
+- 2025-09-30: Admin navigation and functionality fixes (COMPLETED)
+  - Added "إعدادات الاتصال" (Contact Settings) link to admin navigation with Settings icon
+  - Added "سجلات الأمان" (Security Logs) link to admin navigation with Activity icon
+  - Fixed blog page import: Changed from `@/app/actions` to `../manage-blog/actions`
+  - Enabled security logs: Uncommented getActivityLogs() call to display user activity
+  - Created getAllOrders() admin function to view all store orders (bypasses user restrictions)
+  - **Result**: Admin can now access contact settings, view security logs, manage blog posts, and see all orders
