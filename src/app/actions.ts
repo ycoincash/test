@@ -206,18 +206,17 @@ export async function getClientLevels(): Promise<ClientLevel[]> {
 }
 
 export async function getNotificationsForUser(userId: string): Promise<Notification[]> {
-    const q = query(
-        collection(db, 'notifications'),
-        where('userId', '==', userId)
-    );
-    const querySnapshot = await getDocs(q);
+    // Use Admin SDK to bypass Firestore rules (server-side only)
+    const querySnapshot = await adminDb.collection('notifications')
+        .where('userId', '==', userId)
+        .get();
 
     const notifications = querySnapshot.docs.map(doc => {
         const data = doc.data();
         return {
             id: doc.id,
             ...data,
-            createdAt: safeToDate(data.createdAt) || new Date(),
+            createdAt: data.createdAt?.toDate() || new Date(),
         } as Notification;
     });
 
@@ -439,14 +438,11 @@ export async function updateUserPhoneNumber(userId: string, phoneNumber: string)
 }
 
 export async function getUserBalance(userId: string) {
-    const transactionsQuery = query(collection(db, 'cashbackTransactions'), where('userId', '==', userId));
-    const withdrawalsQuery = query(collection(db, 'withdrawals'), where('userId', '==', userId));
-    const ordersQuery = query(collection(db, 'orders'), where('userId', '==', userId));
-
+    // Use Admin SDK to bypass Firestore rules (server-side only)
     const [transactionsSnap, withdrawalsSnap, ordersSnap] = await Promise.all([
-        getDocs(transactionsQuery),
-        getDocs(withdrawalsQuery),
-        getDocs(ordersQuery)
+        adminDb.collection('cashbackTransactions').where('userId', '==', userId).get(),
+        adminDb.collection('withdrawals').where('userId', '==', userId).get(),
+        adminDb.collection('orders').where('userId', '==', userId).get()
     ]);
 
     const totalEarned = transactionsSnap.docs.reduce((sum, doc) => sum + doc.data().cashbackAmount, 0);

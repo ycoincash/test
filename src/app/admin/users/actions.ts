@@ -2,6 +2,7 @@
 'use server';
 
 import { db } from '@/lib/firebase/config';
+import { adminDb } from '@/lib/firebase/admin-config';
 import { collection, getDocs, writeBatch, query, where, limit, getDoc, doc, updateDoc, Timestamp } from 'firebase/firestore';
 import type { UserProfile, UserStatus, ClientLevel, TradingAccount, CashbackTransaction, Withdrawal, Order, KycData, AddressData, ActivityLog } from '@/types';
 import { startOfMonth } from 'date-fns';
@@ -286,17 +287,16 @@ export async function getUserDetails(userId: string) {
 }
 
 export async function getUserActivityLogs(userId: string): Promise<ActivityLog[]> {
-    const q = query(
-        collection(db, 'activityLogs'),
-        where('userId', '==', userId),
-    );
-    const snapshot = await getDocs(q);
+    // Use Admin SDK to bypass Firestore rules (server-side only)
+    const snapshot = await adminDb.collection('activityLogs')
+        .where('userId', '==', userId)
+        .get();
     const logs: ActivityLog[] = snapshot.docs.map(doc => {
         const data = doc.data();
         return {
             id: doc.id,
             ...data,
-            timestamp: (data.timestamp as Timestamp).toDate() || new Date(),
+            timestamp: data.timestamp?.toDate() || new Date(),
         } as ActivityLog
     });
     // Perform sorting in-memory to avoid composite index requirement
