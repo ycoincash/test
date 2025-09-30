@@ -36,5 +36,8 @@ export const config = {
     '/dashboard/:path*',
     '/admin/:path*',
     '/phone-verification',
+    '/api/auth/session',
+    // Note: /api/auth/logout is excluded to prevent CSRF bypass
+    // Logout route handles CSRF validation and cookie clearing itself
   ],
 };

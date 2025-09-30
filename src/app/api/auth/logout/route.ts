@@ -3,17 +3,19 @@ import { getServerConfig } from '@/lib/firebase/auth-edge-config';
 
 export async function POST(request: NextRequest) {
   try {
-    // CSRF protection: Validate Origin/Referer
+    // CSRF protection: Strict origin validation
     const origin = request.headers.get('origin');
     const referer = request.headers.get('referer');
-    const host = request.headers.get('host');
     
     if (!origin && !referer) {
       return NextResponse.json({ error: 'Missing origin/referer' }, { status: 403 });
     }
     
     const requestOrigin = origin || (referer ? new URL(referer).origin : null);
-    if (!requestOrigin || !host || !requestOrigin.includes(host)) {
+    const expectedOrigin = request.nextUrl.origin;
+    
+    if (requestOrigin !== expectedOrigin) {
+      console.error('CSRF: Origin mismatch', { requestOrigin, expectedOrigin });
       return NextResponse.json({ error: 'Invalid origin' }, { status: 403 });
     }
 
@@ -21,9 +23,15 @@ export async function POST(request: NextRequest) {
     
     const response = NextResponse.json({ success: true }, { status: 200 });
 
-    // Clear auth cookie
+    // Clear main auth cookie
     response.cookies.delete({
       name: config.cookieName,
+      path: '/',
+    });
+
+    // Clear signature cookie (if using signed cookies)
+    response.cookies.delete({
+      name: `${config.cookieName}.sig`,
       path: '/',
     });
 

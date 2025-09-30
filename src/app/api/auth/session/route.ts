@@ -1,66 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getTokens } from 'next-firebase-auth-edge';
-import { getServerConfig } from '@/lib/firebase/auth-edge-config';
 
-export async function POST(request: NextRequest) {
-  try {
-    // CSRF protection: Validate Origin/Referer
-    const origin = request.headers.get('origin');
-    const referer = request.headers.get('referer');
-    const host = request.headers.get('host');
-    
-    if (!origin && !referer) {
-      return NextResponse.json({ error: 'Missing origin/referer' }, { status: 403 });
-    }
-    
-    const requestOrigin = origin || (referer ? new URL(referer).origin : null);
-    if (!requestOrigin || !host || !requestOrigin.includes(host)) {
-      return NextResponse.json({ error: 'Invalid origin' }, { status: 403 });
-    }
+// This endpoint is intercepted by authMiddleware which automatically:
+// 1. Validates the Authorization: Bearer <token> header
+// 2. Sets signed HTTP-only cookies (main + signature)
+// 3. Passes through to this handler on success
 
-    const { idToken } = await request.json();
-
-    if (!idToken) {
-      return NextResponse.json({ error: 'Missing idToken' }, { status: 400 });
-    }
-
-    const config = getServerConfig();
-    
-    // Verify ID token and get session tokens
-    const tokens = await getTokens(idToken, {
-      serviceAccount: config.serviceAccount,
-      apiKey: config.apiKey,
-      cookieName: config.cookieName,
-      cookieSignatureKeys: config.cookieSignatureKeys,
-      cookieSerializeOptions: config.cookieSerializeOptions,
-    });
-
-    const response = NextResponse.json({ 
-      success: true,
-      user: {
-        uid: tokens.decodedToken.uid,
-        email: tokens.decodedToken.email
-      }
-    }, { status: 200 });
-
-    // Set HTTP-only, secure, signed cookie
-    response.cookies.set({
-      name: config.cookieName,
-      value: tokens.token,
-      ...config.cookieSerializeOptions,
-    });
-
-    return response;
-  } catch (error) {
-    console.error('Session creation error:', error);
+export async function GET(request: NextRequest) {
+  // Verify Authorization header is present
+  const authHeader = request.headers.get('authorization');
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return NextResponse.json(
-      { error: 'Failed to create session' },
-      { status: 500 }
+      { error: 'Missing Authorization header' },
+      { status: 400 }
     );
   }
+
+  // Middleware has already validated token and set cookies
+  return NextResponse.json({ success: true }, { status: 200 });
 }
 
-// Reject non-POST requests
-export async function GET() {
-  return NextResponse.json({ error: 'Method not allowed' }, { status: 405 });
+// Reject other HTTP methods
+export async function POST() {
+  return NextResponse.json({ error: 'Method not allowed. Use GET with Authorization header' }, { status: 405 });
 }
