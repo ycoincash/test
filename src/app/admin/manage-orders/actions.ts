@@ -9,10 +9,10 @@ import { awardReferralCommission, clawbackReferralCommission, createNotification
 
 export async function updateOrderStatus(orderId: string, status: Order['status']) {
     try {
-        await adminDb.runTransaction, async (transaction) => {
+        await adminDb.runTransaction(async (transaction) => {
             const orderRef = adminDb.collection('orders').doc(orderId);
             const orderSnap = await transaction.get(orderRef);
-            if (!orderSnap.exists()) {
+            if (!orderSnap.exists) {
                 throw new Error("لم يتم العثور على الطلب.");
             }
             const orderData = orderSnap.data() as Order;
