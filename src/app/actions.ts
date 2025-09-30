@@ -281,8 +281,9 @@ export async function getActiveFeedbackFormForUser(idToken: string): Promise<Fee
     
     activeForms.sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime());
 
-    const userResponsesQuery = query(collection(db, 'feedbackResponses'), where('userId', '==', userId));
-    const userResponsesSnap = await getDocs(userResponsesQuery);
+    const userResponsesSnap = await adminDb.collection('feedbackResponses')
+        .where('userId', '==', userId)
+        .get();
     const respondedFormIds = new Set(userResponsesSnap.docs.map(doc => doc.data().formId));
 
     for (const form of activeForms) {

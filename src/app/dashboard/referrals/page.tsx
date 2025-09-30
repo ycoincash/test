@@ -10,15 +10,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuthContext } from '@/hooks/useAuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { db } from "@/lib/firebase/config";
-import { doc, getDoc, Timestamp, collection, query, where, getDocs, orderBy } from "firebase/firestore";
 import type { UserProfile, UserStatus, CashbackTransaction, ClientLevel } from "@/types";
 import { format } from 'date-fns';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import Link from 'next/link';
-import { getClientLevels } from '@/app/actions';
+import { getClientLevels, getUserReferralData } from '@/app/actions';
+import { getCurrentUserIdToken } from '@/lib/client-auth';
 import { Progress } from '@/components/ui/progress';
 import { Label } from '@/components/ui/label';
 
@@ -42,29 +41,6 @@ const getStatusVariant = (status: UserStatus) => {
     }
 };
 
-async function getCommissionHistory(userId: string): Promise<CashbackTransaction[]> {
-    const q = query(
-        collection(db, "cashbackTransactions"),
-        where("userId", "==", userId)
-    );
-    const querySnapshot = await getDocs(q);
-    const allTransactions = querySnapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-            id: doc.id,
-            ...data,
-            date: (data.date as Timestamp).toDate(),
-        } as CashbackTransaction;
-    });
-
-    const commissionTransactions = allTransactions.filter(
-        tx => tx.sourceType === 'cashback' || tx.sourceType === 'store_purchase'
-    );
-    
-    commissionTransactions.sort((a, b) => b.date.getTime() - a.date.getTime());
-    
-    return commissionTransactions;
-}
 
 function CommissionHistoryTab({ history, isLoading }: { history: CashbackTransaction[], isLoading: boolean }) {
     if (isLoading) {
@@ -196,27 +172,15 @@ export default function ReferralsPage() {
             setIsLoading(true);
 
             try {
-                const [levelsData, historyData, referralDetails] = await Promise.all([
+                const idToken = await getCurrentUserIdToken();
+                const [levelsData, referralData] = await Promise.all([
                     getClientLevels(),
-                    getCommissionHistory(user.uid),
-                    user.profile.referrals ? Promise.all(user.profile.referrals.map(uid => getDoc(doc(db, 'users', uid)))) : Promise.resolve([])
+                    getUserReferralData(idToken)
                 ]);
 
                 setLevels(levelsData);
-                setCommissionHistory(historyData);
-
-                const referredUsersData = referralDetails
-                    .filter(docSnap => docSnap.exists())
-                    .map(docSnap => {
-                        const data = docSnap.data();
-                        return {
-                            uid: docSnap.id,
-                            name: data.name,
-                            createdAt: (data.createdAt as Timestamp).toDate(),
-                            status: data.status || 'NEW',
-                        } as ReferralInfo;
-                    });
-                setReferrals(referredUsersData);
+                setCommissionHistory(referralData.commissionHistory);
+                setReferrals(referralData.referrals);
             } catch(e) {
                 console.error("Failed to fetch referral page data", e);
                 toast({ variant: 'destructive', title: "خطأ", description: "فشل تحميل بيانات الإحالة."});
