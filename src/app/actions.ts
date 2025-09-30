@@ -497,6 +497,7 @@ export async function requestWithdrawal(payload: Omit<Withdrawal, 'id' | 'reques
         return { success: false, message: errorMessage };
     });
 }
+// Admin function - gets ALL trading accounts
 export async function getTradingAccounts(): Promise<TradingAccount[]> {
   const accountsSnapshot = await getDocs(collection(db, 'tradingAccounts'));
   const accounts: TradingAccount[] = [];
@@ -512,6 +513,25 @@ export async function getTradingAccounts(): Promise<TradingAccount[]> {
           console.error(`Error processing trading account ${doc.id}:`, error);
       }
   });
+  return accounts;
+}
+
+// User function - gets trading accounts for specific user
+export async function getUserTradingAccounts(userId: string): Promise<TradingAccount[]> {
+  // Use Admin SDK to bypass Firestore rules (server-side only)
+  const accountsSnapshot = await adminDb.collection('tradingAccounts')
+    .where('userId', '==', userId)
+    .get();
+  
+  const accounts: TradingAccount[] = accountsSnapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      ...data,
+      createdAt: data.createdAt?.toDate() || new Date(),
+    } as TradingAccount;
+  });
+  
   return accounts;
 }
 

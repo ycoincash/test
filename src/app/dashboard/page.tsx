@@ -12,8 +12,7 @@ import { db } from "@/lib/firebase/config";
 import { collection, query, where, getCountFromServer, getDocs, Timestamp, orderBy, limit } from "firebase/firestore";
 import { Loader2 } from "lucide-react";
 import type { TradingAccount, CashbackTransaction, FeedbackForm, Offer, BannerSettings, UserProfile } from "@/types";
-import { getUserBalance } from "../actions";
-import { getActiveFeedbackFormForUser } from "../actions";
+import { getUserBalance, getUserTradingAccounts, getCashbackTransactions, getActiveFeedbackFormForUser, submitFeedbackResponse } from "../actions";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -335,26 +334,12 @@ export default function UserDashboardPage() {
       if (user) {
         setIsLoading(true);
         try {
-          const [balanceData, accountsSnapshot, transactionsSnapshot, feedbackForm] = await Promise.all([
+          const [balanceData, linkedAccounts, allTransactions, feedbackForm] = await Promise.all([
             getUserBalance(user.uid),
-            getDocs(query(collection(db, "tradingAccounts"), where("userId", "==", user.uid))),
-            getDocs(query(collection(db, "cashbackTransactions"), where("userId", "==", user.uid))),
+            getUserTradingAccounts(user.uid),
+            getCashbackTransactions(user.uid),
             getActiveFeedbackFormForUser(user.uid)
           ]);
-          
-          const linkedAccounts = accountsSnapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-              id: doc.id,
-              ...data,
-              createdAt: (data.createdAt as Timestamp).toDate(),
-            } as TradingAccount;
-          });
-
-          const allTransactions = transactionsSnapshot.docs.map(doc => {
-              const data = doc.data();
-              return { id: doc.id, ...data, date: (data.date as Timestamp).toDate() } as CashbackTransaction;
-          });
           
           allTransactions.sort((a,b) => b.date.getTime() - a.date.getTime());
           
