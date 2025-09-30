@@ -13,6 +13,7 @@ import { collection, query, where, getCountFromServer, getDocs, Timestamp, order
 import { Loader2 } from "lucide-react";
 import type { TradingAccount, CashbackTransaction, FeedbackForm, Offer, BannerSettings, UserProfile } from "@/types";
 import { getUserBalance, getUserTradingAccounts, getCashbackTransactions, getActiveFeedbackFormForUser, submitFeedbackResponse } from "../actions";
+import { getCurrentUserIdToken } from "@/lib/client-auth";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -334,11 +335,12 @@ export default function UserDashboardPage() {
       if (user) {
         setIsLoading(true);
         try {
+          const idToken = await getCurrentUserIdToken();
           const [balanceData, linkedAccounts, allTransactions, feedbackForm] = await Promise.all([
-            getUserBalance(user.uid),
-            getUserTradingAccounts(user.uid),
-            getCashbackTransactions(user.uid),
-            getActiveFeedbackFormForUser(user.uid)
+            getUserBalance(idToken),
+            getUserTradingAccounts(idToken),
+            getCashbackTransactions(idToken),
+            getActiveFeedbackFormForUser(idToken)
           ]);
           
           allTransactions.sort((a,b) => b.date.getTime() - a.date.getTime());

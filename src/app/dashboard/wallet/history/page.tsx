@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthContext } from "@/hooks/useAuthContext";
 import { getWalletHistory } from "../actions";
+import { getCurrentUserIdToken } from "@/lib/client-auth";
 import type { Withdrawal } from "@/types";
 
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -94,7 +95,9 @@ export default function WalletHistoryPage() {
 
     useEffect(() => {
         if (user) {
-            getWalletHistory(user.uid).then(history => {
+            getCurrentUserIdToken().then(idToken => 
+                getWalletHistory(idToken)
+            ).then(history => {
                 setWithdrawals(history.withdrawals);
                 setIsLoading(false);
             });
