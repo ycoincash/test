@@ -348,10 +348,9 @@ export async function getOrders(idToken: string): Promise<Order[]> {
     
     const ordersSnapshot = await adminDb.collection('orders')
         .where('userId', '==', userId)
-        .orderBy('createdAt', 'desc')
         .get();
     
-    return ordersSnapshot.docs.map(doc => {
+    const orders = ordersSnapshot.docs.map(doc => {
         const data = doc.data();
         return {
             id: doc.id,
@@ -359,6 +358,10 @@ export async function getOrders(idToken: string): Promise<Order[]> {
             createdAt: data.createdAt?.toDate() || new Date(),
         } as Order;
     });
+    
+    // Sort by date client-side (avoids needing Firestore composite index)
+    orders.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    return orders;
 }
 
 export async function getCashbackTransactions(idToken: string): Promise<CashbackTransaction[]> {
