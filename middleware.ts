@@ -7,7 +7,6 @@ export async function middleware(request: NextRequest) {
 
   return authMiddleware(request, {
     loginPath: '/api/auth/session',
-    logoutPath: '/api/auth/logout',
     apiKey: config.apiKey,
     cookieName: config.cookieName,
     cookieSignatureKeys: config.cookieSignatureKeys,
