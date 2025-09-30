@@ -25,6 +25,7 @@ function PhoneVerificationForm() {
 
     const [phoneNumber, setPhoneNumber] = useState<string | undefined>();
     const [isLoading, setIsLoading] = useState(false);
+    const [defaultCountry, setDefaultCountry] = useState<string>('SA');
     const targetUserId = searchParams.get('userId');
     // Only admin mode if user is actually an admin AND targetUserId differs from current user
     const isAdminMode = user?.profile?.admin && targetUserId && targetUserId !== user?.uid;
@@ -35,6 +36,28 @@ function PhoneVerificationForm() {
             router.push('/login');
         }
     }, [targetUserId, user, router, toast]);
+
+    useEffect(() => {
+        async function detectCountry() {
+            if (user?.profile?.country) {
+                setDefaultCountry(user.profile.country);
+            } else {
+                try {
+                    const response = await fetch('/api/geo');
+                    const data = await response.json();
+                    if (data.country) {
+                        setDefaultCountry(data.country);
+                    }
+                } catch (error) {
+                    console.error('Failed to detect country:', error);
+                }
+            }
+        }
+        
+        if (user) {
+            detectCountry();
+        }
+    }, [user]);
 
     const handleSave = async () => {
         if (!phoneNumber || !isPossiblePhoneNumber(phoneNumber)) {
@@ -106,6 +129,7 @@ function PhoneVerificationForm() {
                     <div className="phone-input-container" dir="ltr">
                         <PhoneInput
                             international
+                            defaultCountry={defaultCountry as any}
                             labels={ar}
                             placeholder="أدخل رقم الهاتف"
                             value={phoneNumber}

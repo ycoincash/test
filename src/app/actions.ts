@@ -15,6 +15,7 @@ import { doc, setDoc, Timestamp, getDocs, collection, query, where, runTransacti
 import { generateReferralCode } from "@/lib/referral";
 import { logUserActivity } from "./admin/actions";
 import { getClientSessionInfo } from "@/lib/device-info";
+import { getCountryFromHeaders } from "@/lib/server-geo";
 import type { Order, Product, ProductCategory, CashbackTransaction, KycData, AddressData, FeedbackForm, ClientLevel, Notification, FeedbackResponse, Withdrawal, TradingAccount, UserProfile, BlogPost, DeviceInfo, GeoInfo } from "@/types";
 
 // Hardcoded data based on https://github.com/tcb4dev/cashback1
@@ -74,6 +75,8 @@ export async function handleRegisterUser(formData: { name: string, email: string
         }
     }
 
+    const detectedCountry = await getCountryFromHeaders();
+
     let userCredential;
     try {
         // Create Firebase Auth user
@@ -101,7 +104,7 @@ export async function handleRegisterUser(formData: { name: string, email: string
                 referrals: [],
                 level: 1,
                 monthlyEarnings: 0,
-                country: null,
+                country: detectedCountry,
             });
 
             // Update referrer's referrals array if applicable

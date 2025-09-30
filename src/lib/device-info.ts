@@ -40,26 +40,22 @@ function getDeviceInfo(): DeviceInfo {
 }
 
 async function getGeoInfo(): Promise<GeoInfo> {
-    const token = process.env.NEXT_PUBLIC_IPINFO_TOKEN;
-    const url = token ? `https://ipinfo.io?token=${token}` : 'https://ipapi.co/json/';
-    
     try {
-        const response = await fetch(url);
+        const response = await fetch('/api/geo');
         if (!response.ok) {
-            throw new Error(`Failed to fetch IP info: ${response.statusText}`);
+            throw new Error(`Failed to fetch geo info: ${response.statusText}`);
         }
         const data = await response.json();
         
-        // Normalize data for both ipinfo and ipapi
         return {
-            ip: data.ip,
-            country: data.country_code || data.country,
-            region: data.region,
-            city: data.city,
+            ip: 'client',
+            country: data.country || 'SA',
+            region: undefined,
+            city: undefined,
         };
     } catch (error) {
-        console.warn(`Could not fetch geo data from ${url}:`, error);
-        return { ip: 'unknown' };
+        console.warn('Could not fetch geo data:', error);
+        return { ip: 'unknown', country: 'SA' };
     }
 }
 
