@@ -379,50 +379,99 @@ export async function getCashbackTransactions(idToken: string): Promise<Cashback
 }
 
 export async function placeOrder(
-    userId: string,
+    idToken: string,
     productId: string,
     formData: { userName: string; userEmail: string; deliveryPhoneNumber: string },
     clientInfo: { deviceInfo: DeviceInfo, geoInfo: GeoInfo }
 ) {
-    let product: Product | null = null;
-
-    return runTransaction(db, async (transaction) => {
-        const productRef = doc(db, 'products', productId);
-        const productSnap = await transaction.get(productRef);
-
-        if (!productSnap.exists()) throw new Error("Product not found.");
-        product = productSnap.data() as Product;
-
-        const { availableBalance } = await getUserBalance(userId);
-
-        if (product.stock <= 0) throw new Error("This product is currently out of stock.");
-        if (availableBalance < product.price) throw new Error("You do not have enough available balance to purchase this item.");
-
-        transaction.update(productRef, { stock: increment(-1) });
-
-        const orderRef = doc(collection(db, 'orders'));
-        transaction.set(orderRef, {
-            userId,
-            productId,
-            productName: product.name,
-            productImage: product.imageUrl,
-            price: product.price,
-            status: 'Pending',
-            createdAt: Timestamp.now(),
-            userName: formData.userName,
-            userEmail: formData.userEmail,
-            deliveryPhoneNumber: formData.deliveryPhoneNumber,
-            referralCommissionAwarded: false,
+    // Verify the ID token and extract the user ID
+    const decodedToken = await verifyClientIdToken(idToken);
+    const userId = decodedToken.uid;
+    
+    try {
+        // Use Admin SDK transaction for atomic balance checking and order creation
+        const result = await adminDb.runTransaction(async (transaction) => {
+            // Read user document first to create transactional contention (prevents double-spend)
+            const userRef = adminDb.collection('users').doc(userId);
+            const userSnap = await transaction.get(userRef);
+            if (!userSnap.exists) throw new Error("User not found.");
+            
+            // Get product
+            const productRef = adminDb.collection('products').doc(productId);
+            const productSnap = await transaction.get(productRef);
+            
+            if (!productSnap.exists) throw new Error("Product not found.");
+            const product = productSnap.data() as Product;
+            
+            if (product.stock <= 0) throw new Error("This product is currently out of stock.");
+            
+            // Atomically calculate available balance within transaction
+            const [transactionsSnap, withdrawalsSnap, ordersSnap] = await Promise.all([
+                transaction.get(adminDb.collection('cashbackTransactions').where('userId', '==', userId)),
+                transaction.get(adminDb.collection('withdrawals').where('userId', '==', userId)),
+                transaction.get(adminDb.collection('orders').where('userId', '==', userId).where('status', 'in', ['Pending', 'Shipped', 'Delivered']))
+            ]);
+            
+            const totalEarned = transactionsSnap.docs.reduce((sum, doc) => sum + doc.data().cashbackAmount, 0);
+            
+            let pendingWithdrawals = 0;
+            let completedWithdrawals = 0;
+            withdrawalsSnap.docs.forEach(doc => {
+                const withdrawal = doc.data() as Withdrawal;
+                if (withdrawal.status === 'Processing') {
+                    pendingWithdrawals += withdrawal.amount;
+                } else if (withdrawal.status === 'Completed') {
+                    completedWithdrawals += withdrawal.amount;
+                }
+            });
+            
+            const ordersTotal = ordersSnap.docs.reduce((sum, doc) => sum + doc.data().price, 0);
+            const availableBalance = totalEarned - completedWithdrawals - pendingWithdrawals - ordersTotal;
+            
+            if (availableBalance < product.price) {
+                throw new Error("You do not have enough available balance to purchase this item.");
+            }
+            
+            // Update product stock using FieldValue.increment for better concurrency
+            transaction.update(productRef, { stock: admin.firestore.FieldValue.increment(-1) });
+            
+            // Create order
+            const orderRef = adminDb.collection('orders').doc();
+            transaction.set(orderRef, {
+                userId: userId,
+                productId: productId,
+                productName: product.name,
+                productImage: product.imageUrl,
+                price: product.price,
+                status: 'Pending',
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                userName: formData.userName,
+                userEmail: formData.userEmail,
+                deliveryPhoneNumber: formData.deliveryPhoneNumber,
+                referralCommissionAwarded: false,
+            });
+            
+            // Update user doc to create write contention (prevents concurrent double-spend)
+            transaction.update(userRef, { 
+                lastOrderAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+            
+            return { orderId: orderRef.id, product };
         });
-
-        await logUserActivity(userId, 'store_purchase', clientInfo, { productId, price: product.price });
+        
+        // Log activity after successful transaction (outside transaction to avoid retries)
+        await logUserActivity(userId, 'store_purchase', clientInfo, { 
+            productId, 
+            orderId: result.orderId,
+            price: result.product.price 
+        });
         
         return { success: true, message: 'تم تقديم الطلب بنجاح!' };
-    }).catch(error => {
+    } catch (error) {
         console.error('Error placing order:', error);
         const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred while placing your order.';
         return { success: false, message: errorMessage };
-    });
+    }
 }
 
 

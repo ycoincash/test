@@ -141,3 +141,14 @@ The following Firebase configuration variables must be set in Replit Secrets:
   - Firestore rules already properly restrict order access to owner only
   - **Result**: Users can now only view their own orders, security vulnerability eliminated
   - **Status**: Production-ready, architect-approved
+- 2025-09-30: Store purchase security fix (COMPLETED)
+  - **CRITICAL SECURITY FIX**: Fixed authentication token error and double-spend vulnerability in placeOrder()
+  - Converted placeOrder() to use ID token verification instead of accepting userId from client
+  - Refactored to use single Admin SDK transaction for atomic balance checking and order creation
+  - Implemented user document read+write pattern to create transactional contention (prevents concurrent double-spend)
+  - Balance calculation now atomic within transaction, re-executed on retry
+  - Orders filtered by status (excludes 'Cancelled') consistent with getUserBalance
+  - Moved logUserActivity outside transaction to prevent duplicate logs on retry
+  - Uses FieldValue.increment for stock decrement for better concurrency
+  - **Result**: Users can now successfully purchase from store with proper security and no double-spend risk
+  - **Status**: Production-ready, architect-approved

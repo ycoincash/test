@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuthContext } from "@/hooks/useAuthContext";
 import { placeOrder } from "@/app/actions";
 import { getClientSessionInfo } from "@/lib/device-info";
+import { getCurrentUserIdToken } from "@/lib/client-auth";
 
 
 const purchaseSchema = z.object({
@@ -45,17 +46,24 @@ export function PurchaseForm({ product, isOpen, onClose }: { product: Product; i
         if (!user || !product) return;
         setIsSubmitting(true);
         
-        const clientInfo = await getClientSessionInfo();
-        const result = await placeOrder(user.uid, product.id, data, clientInfo);
+        try {
+            const idToken = await getCurrentUserIdToken();
+            const clientInfo = await getClientSessionInfo();
+            const result = await placeOrder(idToken, product.id, data, clientInfo);
 
-        if (result.success) {
-            toast({ title: "تم بنجاح!", description: result.message });
-            onClose();
-            router.push('/dashboard/store/orders');
-        } else {
-            toast({ variant: 'destructive', title: "فشل الطلب", description: result.message });
+            if (result.success) {
+                toast({ title: "تم بنجاح!", description: result.message });
+                onClose();
+                router.push('/dashboard/store/orders');
+            } else {
+                toast({ variant: 'destructive', title: "فشل الطلب", description: result.message });
+            }
+        } catch (error) {
+            console.error('Error placing order:', error);
+            toast({ variant: 'destructive', title: "خطأ", description: "حدث خطأ أثناء معالجة طلبك" });
+        } finally {
+            setIsSubmitting(false);
         }
-        setIsSubmitting(false);
     };
 
     return (
