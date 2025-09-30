@@ -78,6 +78,26 @@ export async function getCurrentUserId(): Promise<string | null> {
 }
 
 /**
+ * Verifies an ID token passed from the client (for Server Actions)
+ * @param idToken The Firebase ID token from the client
+ * @returns The decoded token containing uid and custom claims
+ * @throws Error if token is invalid or expired
+ */
+export async function verifyClientIdToken(idToken: string) {
+  if (!idToken) {
+    throw new Error('No ID token provided');
+  }
+  
+  try {
+    const decodedToken = await adminAuth.verifyIdToken(idToken);
+    return decodedToken;
+  } catch (error) {
+    console.error('Client ID token verification failed:', error);
+    throw new Error('Invalid or expired authentication token');
+  }
+}
+
+/**
  * Checks if the current user owns the specified resource (for API routes)
  * @param resourceUserId The userId field from the resource
  */

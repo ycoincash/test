@@ -102,3 +102,9 @@ The following Firebase configuration variables must be set in Replit Secrets:
   - Set up admin role management system
   - Installed firebase-admin and tsx packages
   - **Note**: Admin actions need to be migrated from Web SDK to Admin SDK (see SECURITY_IMPLEMENTATION_STATUS.md)
+- 2025-09-30: Server action security migration (IN PROGRESS)
+  - Migrated user data fetching functions to Admin SDK (getUserBalance, getUserTradingAccounts, getCashbackTransactions, etc.)
+  - Reduced Firestore permission errors by using Admin SDK in server actions
+  - **CRITICAL SECURITY ISSUE IDENTIFIED**: Server actions accept userId from client without verification
+  - See SECURITY_CRITICAL.md for full details and remediation plan
+  - Recommended solution: Implement next-firebase-auth-edge with cookie-based authentication
