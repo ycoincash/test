@@ -102,9 +102,14 @@ The following Firebase configuration variables must be set in Replit Secrets:
   - Set up admin role management system
   - Installed firebase-admin and tsx packages
   - **Note**: Admin actions need to be migrated from Web SDK to Admin SDK (see SECURITY_IMPLEMENTATION_STATUS.md)
-- 2025-09-30: Server action security migration (IN PROGRESS)
-  - Migrated user data fetching functions to Admin SDK (getUserBalance, getUserTradingAccounts, getCashbackTransactions, etc.)
-  - Reduced Firestore permission errors by using Admin SDK in server actions
-  - **CRITICAL SECURITY ISSUE IDENTIFIED**: Server actions accept userId from client without verification
-  - See SECURITY_CRITICAL.md for full details and remediation plan
-  - Recommended solution: Implement next-firebase-auth-edge with cookie-based authentication
+- 2025-09-30: Server action security migration (COMPLETED)
+  - Migrated all user data fetching functions to Admin SDK
+  - **CRITICAL SECURITY FIX**: Implemented ID token verification to prevent horizontal privilege escalation
+  - All user-scoped server actions now verify Firebase ID tokens and derive userId server-side
+  - Created `getCurrentUserIdToken()` helper in `src/lib/client-auth.ts` for client-side token retrieval
+  - Created `verifyClientIdToken()` helper in `src/lib/auth-helpers.ts` for server-side token verification
+  - Secured functions include: getUserBalance, notifications, wallet operations, KYC/address submissions, withdrawal requests, phone number updates
+  - Added ownership verification to markNotificationsAsRead to prevent cross-user data access
+  - Security architecture: Admin operations use Admin SDK (bypasses rules), client operations use Web SDK with rule enforcement, all user-scoped actions require token verification
+  - **Status**: Production-ready quick fix implemented and architect-approved
+  - **Future recommendation**: Consider migrating to next-firebase-auth-edge for cookie-based authentication
