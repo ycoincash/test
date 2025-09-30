@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { sendVerificationEmail, submitKycData, submitAddressData } from "@/app/actions";
+import { getCurrentUserIdToken } from "@/lib/client-auth";
 import type { KycData, AddressData } from "@/types";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
@@ -46,7 +47,8 @@ function KycFormDialog({ onKycSubmit }: { onKycSubmit: () => void }) {
     const onSubmit = async (data: KycFormValues) => {
         if (!user) return;
         setIsSubmitting(true);
-        const result = await submitKycData(user.uid, data);
+        const idToken = await getCurrentUserIdToken();
+        const result = await submitKycData(idToken, data);
         if (result.success) {
             toast({ title: "تم الإرسال", description: "تم إرسال معلومات التحقق الخاصة بك للمراجعة." });
             onKycSubmit();
@@ -137,7 +139,8 @@ function AddressFormDialog({ onAddressSubmit }: { onAddressSubmit: () => void })
     const onSubmit = async (data: AddressFormValues) => {
         if (!user) return;
         setIsSubmitting(true);
-        const result = await submitAddressData(user.uid, data);
+        const idToken = await getCurrentUserIdToken();
+        const result = await submitAddressData(idToken, data);
         if (result.success) {
             toast({ title: "تم الإرسال", description: "تم إرسال عنوانك للمراجعة." });
             onAddressSubmit();

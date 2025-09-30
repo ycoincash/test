@@ -80,7 +80,8 @@ function NotificationBell() {
     const handleMarkAsRead = async () => {
         const unreadIds = notifications.filter(n => !n.isRead).map(n => n.id);
         if (unreadIds.length > 0) {
-            await markNotificationsAsRead(unreadIds);
+            const idToken = await getCurrentUserIdToken();
+            await markNotificationsAsRead(idToken, unreadIds);
             setNotifications(notifications.map(n => ({ ...n, isRead: true })));
             setUnreadCount(0);
         }

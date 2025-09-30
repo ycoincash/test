@@ -230,13 +230,29 @@ export async function getNotificationsForUser(idToken: string): Promise<Notifica
     return notifications;
 }
 
-export async function markNotificationsAsRead(notificationIds: string[]) {
+export async function markNotificationsAsRead(idToken: string, notificationIds: string[]) {
+    // Verify the ID token and extract the user ID
+    const decodedToken = await verifyClientIdToken(idToken);
+    const userId = decodedToken.uid;
+    
     // Use Admin SDK batch for better reliability
     const batch = adminDb.batch();
-    notificationIds.forEach(id => {
-        const docRef = adminDb.collection('notifications').doc(id);
-        batch.update(docRef, { isRead: true });
+    
+    // Verify all notifications belong to the user before updating
+    const notificationRefs = notificationIds.map(id => 
+        adminDb.collection('notifications').doc(id)
+    );
+    
+    const notifications = await Promise.all(
+        notificationRefs.map(ref => ref.get())
+    );
+    
+    notifications.forEach((notifSnap, index) => {
+        if (notifSnap.exists && notifSnap.data()?.userId === userId) {
+            batch.update(notificationRefs[index], { isRead: true });
+        }
     });
+    
     await batch.commit();
 }
 
@@ -419,40 +435,49 @@ export async function sendVerificationEmail(): Promise<{ success: boolean; error
 }
 
 
-export async function submitKycData(userId: string, data: Omit<KycData, 'status' | 'submittedAt'>): Promise<{ success: boolean; error?: string }> {
+export async function submitKycData(idToken: string, data: Omit<KycData, 'status' | 'submittedAt'>): Promise<{ success: boolean; error?: string }> {
+    // Verify the ID token and extract the user ID
+    const decodedToken = await verifyClientIdToken(idToken);
+    const userId = decodedToken.uid;
+    
     try {
-        const userRef = doc(db, 'users', userId);
         const kycData: KycData = {
             ...data,
             status: 'Pending',
-            submittedAt: Timestamp.now(),
+            submittedAt: new Date(),
         };
-        await updateDoc(userRef, { kycData });
+        await adminDb.collection('users').doc(userId).update({ kycData });
         return { success: true };
     } catch (e: any) {
         return { success: false, error: e.message };
     }
 }
 
-export async function submitAddressData(userId: string, data: Omit<AddressData, 'status' | 'submittedAt'>): Promise<{ success: boolean; error?: string }> {
+export async function submitAddressData(idToken: string, data: Omit<AddressData, 'status' | 'submittedAt'>): Promise<{ success: boolean; error?: string }> {
+    // Verify the ID token and extract the user ID
+    const decodedToken = await verifyClientIdToken(idToken);
+    const userId = decodedToken.uid;
+    
     try {
-        const userRef = doc(db, 'users', userId);
         const addressData: AddressData = {
             ...data,
             status: 'Pending',
-            submittedAt: Timestamp.now(),
+            submittedAt: new Date(),
         };
-        await updateDoc(userRef, { addressData });
+        await adminDb.collection('users').doc(userId).update({ addressData });
         return { success: true };
     } catch (e: any) {
         return { success: false, error: e.message };
     }
 }
 
-export async function updateUserPhoneNumber(userId: string, phoneNumber: string): Promise<{ success: boolean; error?: string }> {
+export async function updateUserPhoneNumber(idToken: string, phoneNumber: string): Promise<{ success: boolean; error?: string }> {
+    // Verify the ID token and extract the user ID
+    const decodedToken = await verifyClientIdToken(idToken);
+    const userId = decodedToken.uid;
+    
     try {
-        const userRef = doc(db, 'users', userId);
-        await updateDoc(userRef, { 
+        await adminDb.collection('users').doc(userId).update({ 
             phoneNumber: phoneNumber,
             phoneNumberVerified: false // Needs verification
         });
