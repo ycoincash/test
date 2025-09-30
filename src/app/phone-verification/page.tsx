@@ -129,7 +129,7 @@ function PhoneVerificationForm() {
                     <div className="phone-input-container" dir="ltr">
                         <PhoneInput
                             international
-                            defaultCountry={defaultCountry as any}
+                            country={defaultCountry as any}
                             labels={ar}
                             placeholder="أدخل رقم الهاتف"
                             value={phoneNumber}
