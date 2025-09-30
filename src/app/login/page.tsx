@@ -93,7 +93,7 @@ export default function LoginPage() {
     try {
         const idToken = await user.getIdToken();
         const response = await fetch('/api/login', {
-            method: 'POST',
+            method: 'GET',
             headers: { 
                 'Authorization': `Bearer ${idToken}`,
             },
