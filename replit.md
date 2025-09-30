@@ -1,202 +1,41 @@
 # Cashback Trading Platform (رفيق الكاش باك)
 
 ## Overview
-A Next.js-based cashback platform for traders, designed to reward users with cashback on every trade they make. The application features Firebase authentication, Firestore database, and a comprehensive loyalty/referral system.
+A Next.js-based cashback platform for traders, designed to reward users with cashback on every trade. The application aims to provide a comprehensive loyalty and referral system, robust authentication, and trading account management. The business vision is to capture a significant market share in the trading cashback sector by offering a secure, feature-rich, and user-friendly experience.
 
-## Project Architecture
-- **Framework**: Next.js 15.3.3 with Turbopack
-- **Language**: TypeScript
-- **Styling**: TailwindCSS with Radix UI components
-- **Database**: Firebase Firestore
-- **Authentication**: Firebase Auth (Email/Password, Google, Apple)
-- **State Management**: React Context (useAuthContext)
-- **UI Components**: Radix UI primitives with custom styling
-- **AI Integration**: Google Genkit for AI features
+## User Preferences
+I want to ensure all server actions are secure and properly migrate any insecure ID token patterns to secure cookie-based authentication. I expect comprehensive security implementations and verification across the platform. I want the agent to prioritize fixing critical security vulnerabilities and ensuring the system is production-ready.
 
-## Key Features
-- User registration and authentication with Firebase
-- Trading account management with broker integration
-- Cashback calculation and tracking
-- Loyalty points and tier system
-- Referral program with commission tracking
-- Admin dashboard for managing users, brokers, and transactions
-- Blog system with Markdown support
-- Store/marketplace functionality
-- Activity logging and security tracking
-- Multi-language support (Arabic/English, RTL layout)
+## System Architecture
+The platform is built with Next.js 15.3.3 and Turbopack, using TypeScript and styled with TailwindCSS and Radix UI components. Firebase Firestore serves as the database, with Firebase Auth handling user authentication (Email/Password, Google, Apple). State management is handled with React Context (useAuthContext). AI features are integrated using Google Genkit.
 
-## Project Structure
-- `/src/app` - Next.js app router pages and routes
-  - `/admin` - Admin dashboard and management features
-  - `/dashboard` - User dashboard
-  - `/blog` - Blog posts and articles
-  - `actions.ts` - Server actions for data operations
-- `/src/components` - React components
-  - `/ui` - Reusable UI components (Radix UI)
-  - `/admin` - Admin-specific components
-  - `/user` - User-facing components
-  - `/shared` - Shared components (guards, layouts)
-- `/src/lib` - Utility functions and configurations
-  - `/firebase` - Firebase client and admin configuration
-- `/src/hooks` - Custom React hooks
-- `/src/types` - TypeScript type definitions
+**UI/UX Decisions:**
+- Multi-language support with Arabic/English and RTL layout.
+- Radix UI primitives are used for UI components, with custom styling.
 
-## Environment Variables (Required)
-The following Firebase configuration variables must be set in Replit Secrets:
-- `NEXT_PUBLIC_FIREBASE_API_KEY`
-- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
-- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
-- `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
-- `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
-- `NEXT_PUBLIC_FIREBASE_APP_ID`
-- `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID`
-- `FIREBASE_SERVICE_ACCOUNT_KEY_B64` - Base64 encoded service account JSON
-- `IPINFO_TOKEN` - For geo-location services
+**Technical Implementations & Feature Specifications:**
+- User authentication and authorization with Firebase and secure cookie-based sessions.
+- Trading account management, including broker integration and a submission/approval workflow.
+- Cashback calculation, tracking, and a loyalty points/tier system.
+- Referral program with commission tracking.
+- Admin dashboard for comprehensive management of users, brokers, and transactions.
+- Content management features including a blog system with Markdown support.
+- E-commerce functionality with a store/marketplace.
+- Activity logging for security tracking.
+- Geo-location services for user registration via IP detection.
 
-## Development Workflow
-- **Start Dev Server**: Workflow "Server" runs `npm run dev` on port 5000
-- **Port**: 5000 (configured for Replit environment)
-- **Host**: 0.0.0.0 (required for Replit proxy)
-- **Turbopack**: Enabled for faster builds
+**System Design Choices:**
+- **Security-first approach:** Emphasizing Firebase Security Rules, token verification, and a recent migration to HTTP-only signed cookies for authentication to prevent XSS and CSRF.
+- **Server Actions:** All critical user-scoped operations and data fetching are handled via secure server actions, with token verification performed server-side.
+- **Atomic Transactions:** Implemented for sensitive operations like store purchases to prevent double-spending and ensure data consistency.
+- **Project Structure:** Organized into `src/app` for routes, `src/components` for UI, `src/lib` for utilities, `src/hooks` for custom hooks, and `src/types` for TypeScript definitions.
 
-## Deployment
-- **Type**: Autoscale (stateless web application)
-- **Build**: `npm run build`
-- **Run**: `npm start -p 5000 -H 0.0.0.0`
-- Configured via deploy_config_tool
-
-## Important Notes
-- The application uses RTL (right-to-left) layout for Arabic language support
-- Firebase credentials are required for authentication and database operations
-- The `allowedDevOrigins` config allows Replit proxy domains for proper development experience
-- TypeScript and ESLint errors are ignored during builds (configured in next.config.js)
-
-## Security Implementation
-
-### Firebase Security
-- **Firestore Rules**: Comprehensive security rules implemented in `firestore.rules`
-  - User-owned collections with proper ownership checks
-  - Admin-only collections requiring `admin: true` custom claim
-  - Public read-only collections for products, brokers, etc.
-- **Admin Authentication**: Token verification system in `src/lib/auth-helpers.ts`
-- **Admin Role**: Script available at `scripts/set-admin-role.ts` to grant admin privileges
-
-### Security Documentation
-- `SECURITY_MAPPING.md`: Complete action-to-security mapping
-- `SECURITY_IMPLEMENTATION_STATUS.md`: Implementation status and remaining work
-
-### Admin User
-- **UID**: `6yUTvF9JrBQo3GUEqxhUnfleVOE3`
-- **Email**: `alsabhibassem@gmail.com`
-- **Setup**: Run `npx tsx scripts/set-admin-role.ts` to activate admin privileges
-
-## Recent Changes
-- 2025-09-29: Initial Replit environment setup
-  - Configured port 5000 with 0.0.0.0 binding
-  - Updated Next.js config for Replit proxy compatibility
-  - Set up deployment configuration
-  - Installed all npm dependencies
-- 2025-09-29: Firebase security implementation
-  - Created comprehensive Firestore security rules
-  - Implemented authentication helpers and token verification
-  - Set up admin role management system
-  - Installed firebase-admin and tsx packages
-  - **Note**: Admin actions need to be migrated from Web SDK to Admin SDK (see SECURITY_IMPLEMENTATION_STATUS.md)
-- 2025-09-30: Server action security migration (COMPLETED)
-  - Migrated all user data fetching functions to Admin SDK
-  - **CRITICAL SECURITY FIX**: Implemented ID token verification to prevent horizontal privilege escalation
-  - All user-scoped server actions now verify Firebase ID tokens and derive userId server-side
-  - Created `getCurrentUserIdToken()` helper in `src/lib/client-auth.ts` for client-side token retrieval
-  - Created `verifyClientIdToken()` helper in `src/lib/auth-helpers.ts` for server-side token verification
-  - Secured functions include: getUserBalance, notifications, wallet operations, KYC/address submissions, withdrawal requests, phone number updates
-  - Added ownership verification to markNotificationsAsRead to prevent cross-user data access
-  - Security architecture: Admin operations use Admin SDK (bypasses rules), client operations use Web SDK with rule enforcement, all user-scoped actions require token verification
-  - **Status**: Production-ready quick fix implemented and architect-approved
-  - **Future recommendation**: Consider migrating to next-firebase-auth-edge for cookie-based authentication
-- 2025-09-30: User dashboard security fixes (COMPLETED)
-  - Fixed all remaining client SDK queries in user dashboard pages
-  - Updated my-accounts page: Now uses getUserTradingAccounts() and getCashbackTransactions() with ID tokens
-  - Updated transactions page: Now uses getCashbackTransactions() with ID token verification
-  - Updated referrals page: Removed client SDK queries, now uses getUserReferralData() server action
-  - Updated dashboard page: Removed client SDK query for offers, now uses getEnabledOffers()
-  - Fixed getActiveFeedbackFormForUser(): Converted feedbackResponses query from client SDK to Admin SDK
-  - Created new server actions: getUserReferralData(), getEnabledOffers()
-  - **Result**: All Firestore permission errors eliminated, user dashboard fully functional with proper security
-  - **Status**: Production-ready, architect-approved
-- 2025-09-30: Trading account submission security fix (COMPLETED)
-  - Fixed broker link page to use secure server action for trading account submission
-  - Created submitTradingAccount() server action with ID token verification
-  - Implemented atomic transaction for duplicate checking and account creation
-  - Now stores both brokerId (stable identifier) and broker (name for display)
-  - Uses serverTimestamp for createdAt and normalizes account numbers
-  - Complete flow: User submits → Server verifies token → Stores as Pending → Admin approves/rejects
-  - **Result**: Users can now successfully submit trading accounts for review with proper security
-  - **Status**: Production-ready, architect-approved
-- 2025-09-30: Store orders security fix (COMPLETED)
-  - **CRITICAL SECURITY FIX**: Fixed horizontal privilege escalation vulnerability in getOrders()
-  - Converted getOrders() from client SDK to Admin SDK with ID token verification
-  - Function previously accepted userId from client (allowing users to view others' orders)
-  - Now verifies ID token and derives userId server-side
-  - Updated MyOrdersList component to pass ID token instead of userId
-  - Firestore rules already properly restrict order access to owner only
-  - **Result**: Users can now only view their own orders, security vulnerability eliminated
-  - **Status**: Production-ready, architect-approved
-- 2025-09-30: Store purchase security fix (COMPLETED)
-  - **CRITICAL SECURITY FIX**: Fixed authentication token error and double-spend vulnerability in placeOrder()
-  - Converted placeOrder() to use ID token verification instead of accepting userId from client
-  - Refactored to use single Admin SDK transaction for atomic balance checking and order creation
-  - Implemented user document read+write pattern to create transactional contention (prevents concurrent double-spend)
-  - Balance calculation now atomic within transaction, re-executed on retry
-  - Orders filtered by status (excludes 'Cancelled') consistent with getUserBalance
-  - Moved logUserActivity outside transaction to prevent duplicate logs on retry
-  - Uses FieldValue.increment for stock decrement for better concurrency
-  - **Result**: Users can now successfully purchase from store with proper security and no double-spend risk
-  - **Status**: Production-ready, architect-approved
-- 2025-09-30: Vercel deployment fixes (COMPLETED)
-  - Created missing `/src/app/admin/manage-blog/columns.tsx` for blog management table
-  - Created missing `/src/app/admin/manage-contact/actions.ts` for contact settings management
-  - Added `ContactSettings` type to `/src/types/index.ts`
-  - **Result**: Vercel production build now succeeds, all module imports resolved
-- 2025-09-30: Admin navigation and functionality fixes (COMPLETED)
-  - Added "إعدادات الاتصال" (Contact Settings) link to admin navigation with Settings icon
-  - Added "سجلات الأمان" (Security Logs) link to admin navigation with Activity icon
-  - Fixed blog page import: Changed from `@/app/actions` to `../manage-blog/actions`
-  - Enabled security logs: Uncommented getActivityLogs() call to display user activity
-  - Created getAllOrders() admin function to view all store orders (bypasses user restrictions)
-  - **Result**: Admin can now access contact settings, view security logs, manage blog posts, and see all orders
-- 2025-09-30: IP-based geo-location for user registration (COMPLETED)
-  - **SECURITY FIX**: Created server-side geo utility (src/lib/server-geo.ts) using server-only IPINFO_TOKEN
-  - Implemented automatic country detection during user registration via IP headers (X-Forwarded-For)
-  - Updated handleRegisterUser to detect and store country code (ISO 3166-1 alpha-2) in user document
-  - Created /api/geo endpoint for optional UX hints (client-side prefill only, not for storage)
-  - Updated phone verification page to use stored country as defaultCountry in PhoneInput component
-  - Removed NEXT_PUBLIC_IPINFO_TOKEN client-side usage, eliminated token exposure risk
-  - Server-side detection uses ipinfo.io (with IPINFO_TOKEN) and falls back to ipapi.co
-  - **Flow**: Registration → Server detects country from IP → Stores in user.country → Phone verification uses stored country as default
-  - **Result**: Users' country is automatically detected and used for phone number verification, improving UX
-- 2025-09-30: Cookie-based authentication with next-firebase-auth-edge (Phase 2 COMPLETED)
-  - **CRITICAL SECURITY UPGRADE**: Migrated from client-side ID tokens to HTTP-only signed cookies
-  - Installed next-firebase-auth-edge package for industry-standard authentication
-  - Created secure cookie infrastructure with cryptographic signature keys (COOKIE_SIGNATURE_KEYS)
-  - Implemented /api/auth/session endpoint: Validates Firebase tokens, sets signed cookies via middleware
-  - Implemented /api/auth/logout endpoint: CSRF-protected cookie clearing with strict origin validation
-  - Updated middleware.ts: Automatic token validation, refresh, and route protection
-  - **Security improvements**:
-    - HTTP-only cookies prevent XSS attacks (tokens not accessible via JavaScript)
-    - Secure flag enforces HTTPS in production
-    - SameSite=Lax provides CSRF protection
-    - Cryptographic signing prevents cookie tampering
-    - Strict origin validation (request.nextUrl.origin equality) prevents CSRF
-    - Authorization header validation ensures proper token exchange
-  - **Cookie structure**: AuthToken (main) + AuthToken.sig (signature), both required for authentication
-  - **Protected routes**: /dashboard, /admin, /phone-verification automatically redirect to /login without valid cookies
-  - **Architecture**: Middleware intercepts /api/auth/session for cookie issuance, excludes /api/auth/logout to prevent CSRF bypass
-- 2025-09-30: Server actions migration to cookie-based authentication (Phase 3 COMPLETED - PRODUCTION READY)
-  - **CRITICAL SECURITY COMPLETION**: Migrated all 18 remaining server actions from insecure ID token pattern to secure cookie-based authentication
-  - Created `getAuthenticatedUser()` helper in `src/lib/auth/server-auth.ts` to extract and verify user from session cookies
-  - **All server actions now secure**: getUserBalance, getNotificationsForUser, markNotificationsAsRead, getActiveFeedbackFormForUser, submitFeedbackResponse, getOrders, getCashbackTransactions, submitKycData, submitAddressData, updateUserPhoneNumber, requestWithdrawal, getUserTradingAccounts, getUserWithdrawals, getAdminDashboardStats, getUserReferralData, placeOrder, submitTradingAccount, getWalletHistory
-  - **Client component updates**: Updated 12+ files to remove idToken parameter passing and deprecated `getCurrentUserIdToken()` imports
-  - **Cleanup**: Removed all stale `verifyClientIdToken` imports from server actions
-  - **Security verification**: Repository-wide grep confirms zero remaining legacy authentication patterns (no verifyClientIdToken or idToken parameters in src/app)
-  - **Result**: 100% migration complete - all authentication now uses HTTP-only signed cookies, eliminating all client-provided token vulnerabilities
-  - **Status**: Production-ready, architect-approved, zero security vulnerabilities from authentication tokens
+## External Dependencies
+- **Firebase:** Firestore (database), Authentication (user auth), Admin SDK (server-side operations).
+- **Next.js:** Web framework.
+- **Turbopack:** Build tool for Next.js.
+- **TailwindCSS:** Styling framework.
+- **Radix UI:** UI component library.
+- **Google Genkit:** AI integration.
+- **IPinfo.io / ipapi.co:** Geo-location services (server-side with `IPINFO_TOKEN`).
+- **next-firebase-auth-edge:** For secure cookie-based authentication.
