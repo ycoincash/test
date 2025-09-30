@@ -648,6 +648,46 @@ export async function getUserWithdrawals(idToken: string): Promise<Withdrawal[]>
   return withdrawals;
 }
 
+// Admin function - gets dashboard statistics
+export async function getAdminDashboardStats(idToken: string) {
+  // Verify admin token
+  const decodedToken = await verifyClientIdToken(idToken);
+  if (!decodedToken.admin) {
+    throw new Error('Unauthorized: Admin access required');
+  }
+  
+  // Fetch all cashback transactions for commissions calculation
+  const commissionsSnapshot = await adminDb.collection('cashbackTransactions')
+    .where('sourceType', 'in', ['cashback', 'store_purchase'])
+    .get();
+  
+  const totalReferralCommissions = commissionsSnapshot.docs.reduce((sum, doc) => {
+    return sum + (doc.data().cashbackAmount || 0);
+  }, 0);
+  
+  // Fetch non-cancelled orders for store spending
+  const ordersSnapshot = await adminDb.collection('orders')
+    .get();
+  
+  const totalStoreSpending = ordersSnapshot.docs
+    .filter(doc => doc.data().status !== 'Cancelled')
+    .reduce((sum, doc) => sum + (doc.data().price || 0), 0);
+  
+  // Fetch all cashback transactions for total cashback added
+  const allCashbackSnapshot = await adminDb.collection('cashbackTransactions')
+    .get();
+  
+  const totalCashbackAdded = allCashbackSnapshot.docs.reduce((sum, doc) => {
+    return sum + (doc.data().cashbackAmount || 0);
+  }, 0);
+  
+  return {
+    totalReferralCommissions,
+    totalStoreSpending,
+    totalCashbackAdded,
+  };
+}
+
 export async function getPublishedBlogPosts(): Promise<BlogPost[]> {
     const q = query(
         collection(db, 'blogPosts'), 

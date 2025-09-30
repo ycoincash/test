@@ -8,8 +8,8 @@ import { getTradingAccounts } from '@/app/admin/manage-accounts/actions';
 import { getWithdrawals } from '@/app/admin/manage-withdrawals/actions';
 import { getUsers } from '@/app/admin/users/actions';
 import { getPendingVerifications } from '../manage-verifications/actions';
-import { db } from '@/lib/firebase/config';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { getAdminDashboardStats } from '@/app/actions';
+import { getCurrentUserIdToken } from '@/lib/client-auth';
 import type { TradingAccount, UserProfile, Withdrawal, CashbackTransaction, Order } from '@/types';
 import { Loader2, Users, Briefcase, Landmark, ShieldCheck, HandCoins, ShoppingBag, Banknote, DollarSign } from 'lucide-react';
 
@@ -40,22 +40,19 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
+        const idToken = await getCurrentUserIdToken();
         const [
             users, 
             accounts, 
             withdrawals, 
             pendingVerifications, 
-            commissionsSnapshot,
-            ordersSnapshot,
-            allCashbackSnapshot,
+            dashboardStats,
         ] = await Promise.all([
           getUsers(),
           getTradingAccounts(),
           getWithdrawals(),
           getPendingVerifications(),
-          getDocs(query(collection(db, "cashbackTransactions"), where("sourceType", "in", ["cashback", "store_purchase"]))),
-          getDocs(query(collection(db, "orders"), where("status", "!=", "Cancelled"))),
-          getDocs(collection(db, "cashbackTransactions")),
+          getAdminDashboardStats(idToken),
         ]);
         
         const totalUsers = users.length;
@@ -65,9 +62,7 @@ export default function AdminDashboardPage() {
           .filter(w => w.status === 'Completed')
           .reduce((sum, w) => sum + w.amount, 0);
 
-        const totalReferralCommissions = commissionsSnapshot.docs.reduce((sum, doc) => sum + doc.data().cashbackAmount, 0);
-        const totalStoreSpending = ordersSnapshot.docs.reduce((sum, doc) => sum + doc.data().price, 0);
-        const totalCashbackAdded = allCashbackSnapshot.docs.reduce((sum, doc) => sum + doc.data().cashbackAmount, 0);
+        const { totalReferralCommissions, totalStoreSpending, totalCashbackAdded } = dashboardStats;
 
         setStats({ 
             totalUsers, 
