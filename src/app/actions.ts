@@ -779,6 +779,61 @@ export async function getEnabledOffers() {
   }));
 }
 
+// User function - submits trading account for review
+export async function submitTradingAccount(
+  idToken: string,
+  brokerId: string,
+  brokerName: string,
+  accountNumber: string
+): Promise<{ success: boolean; message: string }> {
+  // Verify the ID token and extract the user ID
+  const decodedToken = await verifyClientIdToken(idToken);
+  const userId = decodedToken.uid;
+  
+  // Normalize account number
+  const normalizedAccountNumber = accountNumber.trim();
+  
+  try {
+    // Use transaction for atomic duplicate check and creation
+    return await adminDb.runTransaction(async (transaction) => {
+      // Check for duplicate account
+      const duplicateQuery = await adminDb.collection('tradingAccounts')
+        .where('brokerId', '==', brokerId)
+        .where('accountNumber', '==', normalizedAccountNumber)
+        .get();
+      
+      if (!duplicateQuery.empty) {
+        return {
+          success: false,
+          message: 'رقم حساب التداول هذا مرتبط بالفعل لهذا الوسيط.'
+        };
+      }
+      
+      // Add the trading account
+      const accountRef = adminDb.collection('tradingAccounts').doc();
+      transaction.set(accountRef, {
+        userId,
+        brokerId,
+        broker: brokerName, // For backward compatibility with existing pages
+        accountNumber: normalizedAccountNumber,
+        status: 'Pending',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      
+      return {
+        success: true,
+        message: 'تم تقديم حساب التداول الخاص بك للموافقة.'
+      };
+    });
+  } catch (error) {
+    console.error('Error submitting trading account:', error);
+    return {
+      success: false,
+      message: 'حدثت مشكلة أثناء تقديم حسابك. يرجى المحاولة مرة أخرى.'
+    };
+  }
+}
+
 export async function getPublishedBlogPosts(): Promise<BlogPost[]> {
     const q = query(
         collection(db, 'blogPosts'), 

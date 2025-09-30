@@ -13,7 +13,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useToast } from '@/hooks/use-toast';
 import { useAuthContext } from '@/hooks/useAuthContext';
 import { db } from '@/lib/firebase/config';
-import { collection, addDoc, serverTimestamp, doc, getDoc, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
+import { submitTradingAccount } from '@/app/actions';
+import { getCurrentUserIdToken } from '@/lib/client-auth';
 import type { Broker } from '@/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Info, Loader2, UserPlus, FileText, Link as LinkIcon, ExternalLink, ArrowLeft } from 'lucide-react';
@@ -111,35 +113,17 @@ export default function BrokerLinkPage() {
     }
     setIsSubmitting(true);
     try {
-      // Check for duplicate account
-      const q = query(
-        collection(db, 'tradingAccounts'),
-        where('broker', '==', brokerName),
-        where('accountNumber', '==', data.accountNumber)
-      );
-      const querySnapshot = await getDocs(q);
-
-      if (!querySnapshot.empty) {
-        toast({
-          variant: 'destructive',
-          title: 'الحساب موجود',
-          description: 'رقم حساب التداول هذا مرتبط بالفعل لهذا الوسيط.',
-        });
-        setIsSubmitting(false);
-        return;
+      const idToken = await getCurrentUserIdToken();
+      const result = await submitTradingAccount(idToken, brokerId, brokerName, data.accountNumber);
+      
+      if (result.success) {
+        toast({ title: 'نجاح!', description: result.message });
+        router.push('/dashboard/my-accounts');
+      } else {
+        toast({ variant: 'destructive', title: 'خطأ', description: result.message });
       }
-
-      await addDoc(collection(db, 'tradingAccounts'), {
-        userId: user.uid,
-        broker: brokerName,
-        accountNumber: data.accountNumber,
-        status: 'Pending',
-        createdAt: serverTimestamp(),
-      });
-      toast({ title: 'نجاح!', description: 'تم تقديم حساب التداول الخاص بك للموافقة.' });
-      router.push('/dashboard/my-accounts');
     } catch (error) {
-      console.error('Error adding document: ', error);
+      console.error('Error submitting account: ', error);
       toast({ variant: 'destructive', title: 'خطأ', description: 'حدثت مشكلة أثناء تقديم حسابك. يرجى المحاولة مرة أخرى.' });
     } finally {
       setIsSubmitting(false);

@@ -123,3 +123,12 @@ The following Firebase configuration variables must be set in Replit Secrets:
   - Created new server actions: getUserReferralData(), getEnabledOffers()
   - **Result**: All Firestore permission errors eliminated, user dashboard fully functional with proper security
   - **Status**: Production-ready, architect-approved
+- 2025-09-30: Trading account submission security fix (COMPLETED)
+  - Fixed broker link page to use secure server action for trading account submission
+  - Created submitTradingAccount() server action with ID token verification
+  - Implemented atomic transaction for duplicate checking and account creation
+  - Now stores both brokerId (stable identifier) and broker (name for display)
+  - Uses serverTimestamp for createdAt and normalizes account numbers
+  - Complete flow: User submits → Server verifies token → Stores as Pending → Admin approves/rejects
+  - **Result**: Users can now successfully submit trading accounts for review with proper security
+  - **Status**: Production-ready, architect-approved
