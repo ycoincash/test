@@ -21,20 +21,29 @@ export async function getAuthenticatedUser(): Promise<AuthenticatedUser> {
   const cookieStore = await cookies();
   const config = getServerConfig();
   
+  // Debug: log all cookies
+  const allCookies = cookieStore.getAll();
+  console.log('Available cookies:', allCookies.map(c => c.name));
+  
   const token = cookieStore.get(config.cookieName)?.value;
   
   if (!token) {
+    console.error('No session cookie found. Looking for:', config.cookieName);
     throw new Error('Unauthorized: No session cookie found');
   }
 
   try {
-    const tokens = await getTokens(token, {
+    const tokens = await getTokens(cookieStore, {
       serviceAccount: config.serviceAccount,
       apiKey: config.apiKey,
       cookieName: config.cookieName,
       cookieSignatureKeys: config.cookieSignatureKeys,
       cookieSerializeOptions: config.cookieSerializeOptions,
     });
+
+    if (!tokens) {
+      throw new Error('No valid tokens found');
+    }
 
     return {
       uid: tokens.decodedToken.uid,

@@ -146,11 +146,20 @@ export async function handleRegisterUser(formData: { name: string, email: string
 
 export async function handleLogout() {
     try {
-        // Clear HTTP-only auth cookie
-        await fetch('/api/auth/logout', { method: 'POST' });
+        // Clear HTTP-only auth cookies by setting them to expired
+        const { cookies: nextCookies } = await import('next/headers');
+        const cookieStore = await nextCookies();
+        const config = (await import('@/lib/firebase/auth-edge-config')).getServerConfig();
         
-        // Sign out from Firebase client
-        await signOut(auth);
+        cookieStore.set(config.cookieName, '', {
+            ...config.cookieSerializeOptions,
+            maxAge: 0,
+        });
+        
+        cookieStore.set(`${config.cookieName}.sig`, '', {
+            ...config.cookieSerializeOptions,
+            maxAge: 0,
+        });
         
         return { success: true };
     } catch (error) {
