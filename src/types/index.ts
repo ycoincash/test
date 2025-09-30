@@ -447,3 +447,17 @@ export interface FeedbackResponse {
 export interface EnrichedFeedbackResponse extends FeedbackResponse {
     userName: string;
 }
+
+export interface ContactSettings {
+    id: string;
+    email: string;
+    phone: string;
+    address: string;
+    social: {
+        facebook: string;
+        twitter: string;
+        instagram: string;
+        whatsapp: string;
+        telegram: string;
+    };
+}
