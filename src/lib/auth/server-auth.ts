@@ -21,14 +21,9 @@ export async function getAuthenticatedUser(): Promise<AuthenticatedUser> {
   const cookieStore = await cookies();
   const config = getServerConfig();
   
-  // Debug: log all cookies
-  const allCookies = cookieStore.getAll();
-  console.log('Available cookies:', allCookies.map(c => c.name));
-  
   const token = cookieStore.get(config.cookieName)?.value;
   
   if (!token) {
-    console.error('No session cookie found. Looking for:', config.cookieName);
     throw new Error('Unauthorized: No session cookie found');
   }
 

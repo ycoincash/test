@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authMiddleware } from 'next-firebase-auth-edge';
-import { getServerConfig } from './src/lib/firebase/auth-edge-config';
+import { getServerConfig } from './lib/firebase/auth-edge-config';
 
 export async function middleware(request: NextRequest) {
   const config = getServerConfig();
@@ -38,7 +38,5 @@ export const config = {
     '/dashboard/:path*',
     '/admin/:path*',
     '/phone-verification',
-    '/',
-    '/((?!_next|favicon.ico|.*\\.).*)',
   ],
 };
