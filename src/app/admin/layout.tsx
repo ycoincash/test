@@ -39,7 +39,6 @@ import { AdminGuard } from "@/components/shared/AdminGuard";
 import { cn } from "@/lib/utils";
 import { useAuthContext } from "@/hooks/useAuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { handleLogout } from "../actions";
 
 const navLinks = [
     { href: "/admin/dashboard", icon: LayoutGrid, label: "لوحة التحكم" },

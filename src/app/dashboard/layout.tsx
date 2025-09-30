@@ -39,7 +39,7 @@ import { AuthProvider, useAuthContext } from "@/hooks/useAuthContext";
 import { AuthGuard } from "@/components/shared/AuthGuard";
 import { useEffect, useState, useCallback } from "react";
 import type { Notification, ClientLevel } from "@/types";
-import { getNotificationsForUser, markNotificationsAsRead, handleLogout, getClientLevels } from "@/app/actions";
+import { getNotificationsForUser, markNotificationsAsRead, getClientLevels } from "@/app/actions";
 import { formatDistanceToNow } from "date-fns";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
