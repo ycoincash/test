@@ -31,8 +31,6 @@ import { Badge } from "@/components/ui/badge"
 import { Info, Loader2, Copy, Banknote, XCircle, Wallet, Briefcase, History, ArrowDownToLine, ArrowUpFromLine, ChevronLeft } from "lucide-react";
 import type { Withdrawal, PaymentMethod, TradingAccount } from "@/types";
 import { useAuthContext } from "@/hooks/useAuthContext";
-import { db } from "@/lib/firebase/config";
-import { collection, query, where, getDocs, addDoc, serverTimestamp, Timestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import {
@@ -41,7 +39,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { getUserBalance, requestWithdrawal } from "@/app/actions";
+import { getUserBalance, requestWithdrawal, getUserWithdrawals, getUserTradingAccounts } from "@/app/actions";
 import { getCurrentUserIdToken } from "@/lib/client-auth";
 import { getPaymentMethods } from "@/app/admin/manage-payment-methods/actions";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -92,11 +90,11 @@ function WithdrawTabContent() {
             setIsFetching(true);
             try {
                 const idToken = await getCurrentUserIdToken();
-                const [balanceData, withdrawalsSnapshot, adminMethodsData, accountsSnapshot] = await Promise.all([
+                const [balanceData, withdrawalsData, adminMethodsData, accountsData] = await Promise.all([
                     getUserBalance(idToken),
-                    getDocs(query(collection(db, "withdrawals"), where("userId", "==", user.uid))),
+                    getUserWithdrawals(idToken),
                     getPaymentMethods(),
-                    getDocs(query(collection(db, "tradingAccounts"), where("userId", "==", user.uid), where("status", "==", "Approved"))),
+                    getUserTradingAccounts(idToken),
                 ]);
 
                 setAvailableBalance(balanceData.availableBalance);
@@ -117,17 +115,8 @@ function WithdrawTabContent() {
                     details: allPossibleDetailFields,
                 });
 
-                const withdrawals: Withdrawal[] = withdrawalsSnapshot.docs.map(doc => {
-                    const data = doc.data();
-                    return { 
-                        id: doc.id,
-                        ...data,
-                        requestedAt: (data.requestedAt as Timestamp).toDate(),
-                        completedAt: data.completedAt ? (data.completedAt as Timestamp).toDate() : undefined,
-                    } as Withdrawal;
-                });
-
-                 const tradingAccounts = accountsSnapshot.docs.map(doc => ({id: doc.id, ...doc.data()}) as TradingAccount);
+                const withdrawals = withdrawalsData;
+                const tradingAccounts = accountsData.filter(acc => acc.status === 'Approved');
                  setUserTradingAccounts(tradingAccounts);
                 
                 withdrawals.sort((a, b) => b.requestedAt.getTime() - a.requestedAt.getTime());

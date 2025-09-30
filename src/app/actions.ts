@@ -624,6 +624,30 @@ export async function getUserTradingAccounts(idToken: string): Promise<TradingAc
   return accounts;
 }
 
+// User function - gets withdrawals for specific user
+export async function getUserWithdrawals(idToken: string): Promise<Withdrawal[]> {
+  // Verify the ID token and extract the user ID
+  const decodedToken = await verifyClientIdToken(idToken);
+  const userId = decodedToken.uid;
+  
+  // Use Admin SDK to bypass Firestore rules (server-side only)
+  const withdrawalsSnapshot = await adminDb.collection('withdrawals')
+    .where('userId', '==', userId)
+    .get();
+  
+  const withdrawals: Withdrawal[] = withdrawalsSnapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      ...data,
+      requestedAt: data.requestedAt?.toDate() || new Date(),
+      completedAt: data.completedAt?.toDate(),
+    } as Withdrawal;
+  });
+  
+  return withdrawals;
+}
+
 export async function getPublishedBlogPosts(): Promise<BlogPost[]> {
     const q = query(
         collection(db, 'blogPosts'), 
