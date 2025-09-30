@@ -113,3 +113,13 @@ The following Firebase configuration variables must be set in Replit Secrets:
   - Security architecture: Admin operations use Admin SDK (bypasses rules), client operations use Web SDK with rule enforcement, all user-scoped actions require token verification
   - **Status**: Production-ready quick fix implemented and architect-approved
   - **Future recommendation**: Consider migrating to next-firebase-auth-edge for cookie-based authentication
+- 2025-09-30: User dashboard security fixes (COMPLETED)
+  - Fixed all remaining client SDK queries in user dashboard pages
+  - Updated my-accounts page: Now uses getUserTradingAccounts() and getCashbackTransactions() with ID tokens
+  - Updated transactions page: Now uses getCashbackTransactions() with ID token verification
+  - Updated referrals page: Removed client SDK queries, now uses getUserReferralData() server action
+  - Updated dashboard page: Removed client SDK query for offers, now uses getEnabledOffers()
+  - Fixed getActiveFeedbackFormForUser(): Converted feedbackResponses query from client SDK to Admin SDK
+  - Created new server actions: getUserReferralData(), getEnabledOffers()
+  - **Result**: All Firestore permission errors eliminated, user dashboard fully functional with proper security
+  - **Status**: Production-ready, architect-approved
