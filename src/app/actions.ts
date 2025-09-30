@@ -231,9 +231,10 @@ export async function getNotificationsForUser(idToken: string): Promise<Notifica
 }
 
 export async function markNotificationsAsRead(notificationIds: string[]) {
-    const batch = writeBatch(db);
+    // Use Admin SDK batch for better reliability
+    const batch = adminDb.batch();
     notificationIds.forEach(id => {
-        const docRef = doc(db, 'notifications', id);
+        const docRef = adminDb.collection('notifications').doc(id);
         batch.update(docRef, { isRead: true });
     });
     await batch.commit();
@@ -500,26 +501,61 @@ export async function getUserBalance(idToken: string) {
         totalSpentOnOrders: Number(totalSpentOnOrders.toFixed(2)),
     };
 }
-export async function requestWithdrawal(payload: Omit<Withdrawal, 'id' | 'requestedAt'>) {
-    return runTransaction(db, async (transaction) => {
-        // Validate user balance
-        const { availableBalance } = await getUserBalance(payload.userId);
-        if (payload.amount > availableBalance) {
-            throw new Error("Insufficient available balance for this withdrawal.");
-        }
-        
-        const newWithdrawalRef = doc(collection(db, "withdrawals"));
-        transaction.set(newWithdrawalRef, {
-            ...payload,
-            requestedAt: serverTimestamp()
+export async function requestWithdrawal(
+    idToken: string, 
+    payload: Omit<Withdrawal, 'id' | 'requestedAt' | 'userId'>
+) {
+    // Verify the ID token and extract the user ID
+    const decodedToken = await verifyClientIdToken(idToken);
+    const userId = decodedToken.uid;
+    
+    try {
+        // Use Admin SDK for transaction
+        await adminDb.runTransaction(async (transaction) => {
+            // Validate user balance server-side
+            const [transactionsSnap, withdrawalsSnap, ordersSnap] = await Promise.all([
+                adminDb.collection('cashbackTransactions').where('userId', '==', userId).get(),
+                adminDb.collection('withdrawals').where('userId', '==', userId).get(),
+                adminDb.collection('orders').where('userId', '==', userId).get()
+            ]);
+
+            const totalEarned = transactionsSnap.docs.reduce((sum, doc) => sum + doc.data().cashbackAmount, 0);
+            
+            let pendingWithdrawals = 0;
+            let completedWithdrawals = 0;
+            withdrawalsSnap.docs.forEach(doc => {
+                const withdrawal = doc.data() as Withdrawal;
+                if (withdrawal.status === 'Processing') {
+                    pendingWithdrawals += withdrawal.amount;
+                } else if (withdrawal.status === 'Completed') {
+                    completedWithdrawals += withdrawal.amount;
+                }
+            });
+
+            const totalSpentOnOrders = ordersSnap.docs
+                .filter(doc => doc.data().status !== 'Cancelled')
+                .reduce((sum, doc) => sum + doc.data().price, 0);
+            
+            const availableBalance = totalEarned - completedWithdrawals - pendingWithdrawals - totalSpentOnOrders;
+            
+            if (payload.amount > availableBalance) {
+                throw new Error("Insufficient available balance for this withdrawal.");
+            }
+            
+            const newWithdrawalRef = adminDb.collection('withdrawals').doc();
+            transaction.set(newWithdrawalRef, {
+                ...payload,
+                userId,
+                requestedAt: new Date()
+            });
         });
         
         return { success: true, message: 'Withdrawal request submitted successfully.' };
-    }).catch(error => {
+    } catch (error) {
         console.error('Error requesting withdrawal:', error);
         const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred.';
         return { success: false, message: errorMessage };
-    });
+    }
 }
 // Admin function - gets ALL trading accounts
 export async function getTradingAccounts(): Promise<TradingAccount[]> {

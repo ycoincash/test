@@ -40,6 +40,7 @@ import { AuthGuard } from "@/components/shared/AuthGuard";
 import { useEffect, useState, useCallback } from "react";
 import type { Notification, ClientLevel } from "@/types";
 import { getNotificationsForUser, markNotificationsAsRead, handleLogout, getClientLevels } from "@/app/actions";
+import { getCurrentUserIdToken } from "@/lib/client-auth";
 import { formatDistanceToNow } from "date-fns";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -63,7 +64,8 @@ function NotificationBell() {
         if (!user) return;
         
         const fetchNotifications = async () => {
-            const data = await getNotificationsForUser(user.uid);
+            const idToken = await getCurrentUserIdToken();
+            const data = await getNotificationsForUser(idToken);
             setNotifications(data);
             setUnreadCount(data.filter(n => !n.isRead).length);
         };

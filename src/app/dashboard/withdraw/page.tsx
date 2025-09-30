@@ -225,8 +225,7 @@ function WithdrawTabContent() {
 
         setIsLoading(true);
         
-        const payload: Omit<Withdrawal, 'id' | 'requestedAt'> = {
-            userId: user.uid,
+        const payload: Omit<Withdrawal, 'id' | 'requestedAt' | 'userId'> = {
             amount: values.amount,
             status: 'Processing',
             paymentMethod: paymentMethodName,
@@ -234,7 +233,8 @@ function WithdrawTabContent() {
         };
 
         try {
-            const result = await requestWithdrawal(payload);
+            const idToken = await getCurrentUserIdToken();
+            const result = await requestWithdrawal(idToken, payload);
             if (!result.success) {
                 throw new Error(result.message);
             }
