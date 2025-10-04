@@ -331,6 +331,29 @@ CREATE TABLE IF NOT EXISTS offers (
 );
 
 -- ============================================
+-- STEP 2.5: Ensure All Columns Exist (For Existing Databases)
+-- ============================================
+
+-- Add missing columns if tables already exist from previous runs
+ALTER TABLE blog_posts ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'draft' CHECK (status IN ('draft', 'published'));
+ALTER TABLE blog_posts ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT ARRAY[]::TEXT[];
+ALTER TABLE blog_posts ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
+ALTER TABLE feedback_forms ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+ALTER TABLE feedback_forms ADD COLUMN IF NOT EXISTS response_count INTEGER DEFAULT 0;
+
+ALTER TABLE offers ADD COLUMN IF NOT EXISTS is_enabled BOOLEAN DEFAULT TRUE;
+ALTER TABLE offers ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'text';
+ALTER TABLE offers ADD COLUMN IF NOT EXISTS script_code TEXT;
+ALTER TABLE offers ADD COLUMN IF NOT EXISTS target_levels TEXT[] DEFAULT ARRAY[]::TEXT[];
+ALTER TABLE offers ADD COLUMN IF NOT EXISTS target_countries TEXT[] DEFAULT ARRAY[]::TEXT[];
+ALTER TABLE offers ADD COLUMN IF NOT EXISTS target_statuses TEXT[] DEFAULT ARRAY[]::TEXT[];
+
+ALTER TABLE payment_methods ADD COLUMN IF NOT EXISTS is_enabled BOOLEAN DEFAULT TRUE;
+
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'Pending';
+
+-- ============================================
 -- STEP 3: Row Level Security (RLS) Policies
 -- ============================================
 
