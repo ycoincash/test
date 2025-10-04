@@ -71,7 +71,7 @@ export interface UserProfile {
 
 
 export interface KycData {
-    documentType: 'id_card' | 'passport';
+    documentType: 'id_card' | 'passport' | 'driver_license';
     documentNumber: string;
     fullName: string;
     dateOfBirth: Date;
@@ -81,6 +81,7 @@ export interface KycData {
     gender: 'male' | 'female';
     documentFrontUrl: string;
     documentBackUrl?: string;
+    selfieUrl?: string;
     status: 'Pending' | 'Verified' | 'Rejected';
     submittedAt: Date;
     rejectionReason?: string;

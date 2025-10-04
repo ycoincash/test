@@ -76,6 +76,16 @@ The following environment variables must be configured in Replit Secrets:
 **Run validation:** `bash scripts/validate-database-schema.sh`
 
 ### Recent Changes
+- **2025-10-04:** Admin KYC Review System with Data Extraction
+  - Created new KycReviewForm component for admin verification workflow
+  - Displays ALL uploaded documents (front, back, selfie) in side-by-side layout
+  - Admin fills in personal data extracted from documents (name, gender, DOB, document number, etc.)
+  - User workflow: Upload documents only (type + country + images)
+  - Admin workflow: View documents + Extract data + Approve/Reject
+  - Added approveKycWithData server action to save extracted data with approval
+  - Updated KycData type to include selfieUrl and driver_license document type
+  - Next.js image configuration updated to allow Supabase storage domain (*.supabase.co)
+  - Proper separation: users upload, admins review and extract personal information
 - **2025-10-04:** KYC Document Upload SQL Adjustments
   - Created separate SQL migration file `kyc_document_upload_adjustments.sql`
   - Extended `document_type` enum to support 'driver_license' (previously only id_card, passport)

@@ -60,6 +60,7 @@ export async function getPendingVerifications(): Promise<PendingVerification[]> 
           gender: user.kyc_gender,
           documentFrontUrl: user.kyc_document_front_url || '',
           documentBackUrl: user.kyc_document_back_url,
+          selfieUrl: user.kyc_selfie_url,
           status: user.kyc_status,
           submittedAt: user.kyc_submitted_at ? new Date(user.kyc_submitted_at) : new Date(),
           rejectionReason: user.kyc_rejection_reason,
@@ -103,6 +104,51 @@ export async function getPendingVerifications(): Promise<PendingVerification[]> 
   pendingRequests.sort((a, b) => b.requestedAt.getTime() - a.requestedAt.getTime());
 
   return pendingRequests;
+}
+
+export async function approveKycWithData(
+  userId: string,
+  extractedData: {
+    fullName: string;
+    gender: 'male' | 'female';
+    dateOfBirth: string;
+    documentNumber: string;
+    documentIssueDate: string;
+    documentExpiryDate: string;
+  }
+) {
+  try {
+    const supabase = await createAdminClient();
+
+    const { error } = await supabase
+      .from('users')
+      .update({
+        kyc_full_name: extractedData.fullName,
+        kyc_gender: extractedData.gender,
+        kyc_date_of_birth: extractedData.dateOfBirth,
+        kyc_document_number: extractedData.documentNumber,
+        kyc_document_issue_date: extractedData.documentIssueDate || null,
+        kyc_document_expiry_date: extractedData.documentExpiryDate || null,
+        kyc_status: 'Verified',
+        kyc_rejection_reason: null,
+      })
+      .eq('id', userId);
+
+    if (error) throw error;
+
+    await createNotification(
+      userId,
+      'تم التحقق من هويتك بنجاح.',
+      'general',
+      '/dashboard/settings/verification'
+    );
+
+    return { success: true, message: 'تم الموافقة على التحقق وحفظ البيانات' };
+  } catch (error) {
+    console.error('Error approving KYC with data:', error);
+    const errorMessage = error instanceof Error ? error.message : 'حدث خطأ غير معروف';
+    return { success: false, message: `فشل الموافقة: ${errorMessage}` };
+  }
 }
 
 export async function updateVerificationStatus(

@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from "react";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { useToast } from "@/hooks/use-toast";
-import { getPendingVerifications, updateVerificationStatus } from "./actions";
+import { getPendingVerifications, updateVerificationStatus, approveKycWithData } from "./actions";
 import { Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { PendingVerification } from "@/types";
@@ -17,6 +17,7 @@ import { useForm } from "react-hook-form";
 import { DataTable } from "@/components/data-table/data-table";
 import { getColumns } from "./columns";
 import { DocumentViewer } from "@/components/admin/manage-verifications/DocumentViewer";
+import { KycReviewForm } from "@/components/admin/manage-verifications/KycReviewForm";
 
 const rejectReasonSchema = z.object({
     reason: z.string().min(10, "سبب الرفض مطلوب."),
@@ -117,9 +118,38 @@ export default function ManageVerificationsPage() {
 
     const handleViewDocuments = (request: PendingVerification) => {
         if (request.type === 'KYC' || request.type === 'Address') {
-            setDocumentViewer({ isOpen: true, request });
+            setDocumentViewer({ isOpen: true, request: request as DocumentRequest });
         }
     }
+
+    const handleKycApproveWithData = async (extractedData: any) => {
+        if (!documentViewer.request) return;
+        const result = await approveKycWithData(documentViewer.request.userId, extractedData);
+        if (result.success) {
+            toast({ title: 'نجاح', description: result.message });
+            setDocumentViewer({ isOpen: false, request: null });
+            fetchRequests();
+        } else {
+            throw new Error(result.message);
+        }
+    };
+
+    const handleKycReject = async (reason: string) => {
+        if (!documentViewer.request) return;
+        const result = await updateVerificationStatus(
+            documentViewer.request.userId,
+            'kyc',
+            'Rejected',
+            reason
+        );
+        if (result.success) {
+            toast({ title: 'تم', description: result.message });
+            setDocumentViewer({ isOpen: false, request: null });
+            fetchRequests();
+        } else {
+            throw new Error(result.message);
+        }
+    };
 
     const columns = getColumns(handleApprove, handleRejectRequest, handleViewDocuments);
 
@@ -150,7 +180,25 @@ export default function ManageVerificationsPage() {
                 />
             )}
 
-            {documentViewer.isOpen && documentViewer.request && (
+            {documentViewer.isOpen && documentViewer.request && documentViewer.request.type === 'KYC' && 'documentFrontUrl' in documentViewer.request.data && (
+                <KycReviewForm
+                    isOpen={documentViewer.isOpen}
+                    onClose={() => setDocumentViewer({ isOpen: false, request: null })}
+                    userId={documentViewer.request.userId}
+                    userName={documentViewer.request.userName}
+                    userEmail={documentViewer.request.userEmail}
+                    documentType={documentViewer.request.data.documentType}
+                    nationality={documentViewer.request.data.nationality}
+                    frontUrl={documentViewer.request.data.documentFrontUrl}
+                    backUrl={documentViewer.request.data.documentBackUrl}
+                    selfieUrl={documentViewer.request.data.selfieUrl}
+                    submittedAt={documentViewer.request.data.submittedAt}
+                    onApprove={handleKycApproveWithData}
+                    onReject={handleKycReject}
+                />
+            )}
+
+            {documentViewer.isOpen && documentViewer.request && documentViewer.request.type === 'Address' && 'documentUrl' in documentViewer.request.data && (
                 <DocumentViewer
                     isOpen={documentViewer.isOpen}
                     onClose={() => setDocumentViewer({ isOpen: false, request: null })}
