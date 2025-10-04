@@ -19,7 +19,7 @@ const kycSchema = z.object({
   nationality: z.string().min(2, 'بلد الإصدار مطلوب'),
   documentFrontFile: z.instanceof(File, { message: 'صورة الوثيقة (الوجه الأمامي) مطلوبة' }),
   documentBackFile: z.instanceof(File).optional(),
-  selfieFile: z.instanceof(File, { message: 'صورة سيلفي مطلوبة' }),
+  selfieFile: z.instanceof(File).optional(),
 });
 
 type KycFormValues = z.infer<typeof kycSchema>;
@@ -129,6 +129,23 @@ export function KycVerificationForm({ onSuccess, onCancel, userCountry }: KycVer
 
   const onSubmit = async (data: KycFormValues) => {
     console.log('🚀 KYC Form submission started');
+    console.log('📋 Form data received:', {
+      hasFront: !!data.documentFrontFile,
+      hasBack: !!data.documentBackFile,
+      hasSelfie: !!data.selfieFile,
+      documentType: data.documentType,
+      nationality: data.nationality
+    });
+
+    if (!data.documentFrontFile) {
+      toast({
+        variant: 'destructive',
+        title: 'خطأ',
+        description: 'يجب رفع صورة الوثيقة الأمامية'
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     setUploadProgress({});
     
@@ -151,11 +168,15 @@ export function KycVerificationForm({ onSuccess, onCancel, userCountry }: KycVer
         backUrl = backResult.url;
       }
 
-      console.log('📤 Uploading selfie...');
-      const selfieResult = await uploadFileWithProgress(data.selfieFile, 'kyc_selfie', 'selfie');
-      
-      if (!selfieResult.success) {
-        throw new Error(selfieResult.error || 'فشل رفع صورة السيلفي');
+      let selfieUrl: string | undefined;
+      if (data.selfieFile) {
+        console.log('📤 Uploading selfie...');
+        const selfieResult = await uploadFileWithProgress(data.selfieFile, 'kyc_selfie', 'selfie');
+        
+        if (!selfieResult.success) {
+          throw new Error(selfieResult.error || 'فشل رفع صورة السيلفي');
+        }
+        selfieUrl = selfieResult.url;
       }
 
       console.log('📡 Sending KYC data to API endpoint...');
@@ -167,7 +188,7 @@ export function KycVerificationForm({ onSuccess, onCancel, userCountry }: KycVer
           nationality: data.nationality,
           documentFrontUrl: frontResult.url,
           documentBackUrl: backUrl,
-          selfieUrl: selfieResult.url,
+          selfieUrl: selfieUrl,
         }),
       });
 
@@ -557,7 +578,7 @@ export function KycVerificationForm({ onSuccess, onCancel, userCountry }: KycVer
                 <Button
                   type="submit"
                   className="flex-1 h-12 bg-primary hover:bg-primary/90"
-                  disabled={isSubmitting || !frontPreview || !selfiePreview}
+                  disabled={isSubmitting || !frontPreview}
                 >
                   {isSubmitting ? (
                     <>
