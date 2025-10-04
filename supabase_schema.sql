@@ -331,14 +331,36 @@ CREATE TABLE IF NOT EXISTS offers (
 );
 
 -- ============================================
--- STEP 2.5: Ensure All Columns Exist (For Existing Databases)
+-- STEP 2.5: Migrate Existing Database Schema
 -- ============================================
 
--- Add missing columns if tables already exist from previous runs
-ALTER TABLE blog_posts ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'draft' CHECK (status IN ('draft', 'published'));
-ALTER TABLE blog_posts ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT ARRAY[]::TEXT[];
-ALTER TABLE blog_posts ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+-- Migrate blog_posts from old structure to new structure
+DO $$ 
+BEGIN
+    -- Add status column (migrate from is_published)
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='blog_posts' AND column_name='status') THEN
+        ALTER TABLE blog_posts ADD COLUMN status TEXT;
+        UPDATE blog_posts SET status = CASE WHEN is_published = true THEN 'published' ELSE 'draft' END;
+        ALTER TABLE blog_posts ALTER COLUMN status SET DEFAULT 'draft';
+        ALTER TABLE blog_posts ADD CONSTRAINT blog_posts_status_check CHECK (status IN ('draft', 'published'));
+    END IF;
+    
+    -- Add author_name and author_id (migrate from author)
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='blog_posts' AND column_name='author_name') THEN
+        ALTER TABLE blog_posts ADD COLUMN author_name TEXT;
+        ALTER TABLE blog_posts ADD COLUMN author_id TEXT;
+        UPDATE blog_posts SET author_name = COALESCE(author, 'Admin'), author_id = 'migrated';
+        ALTER TABLE blog_posts ALTER COLUMN author_name SET NOT NULL;
+        ALTER TABLE blog_posts ALTER COLUMN author_id SET NOT NULL;
+    END IF;
+    
+    -- Add tags array
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='blog_posts' AND column_name='tags') THEN
+        ALTER TABLE blog_posts ADD COLUMN tags TEXT[] DEFAULT ARRAY[]::TEXT[];
+    END IF;
+END $$;
 
+-- Add missing columns to other tables
 ALTER TABLE feedback_forms ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
 ALTER TABLE feedback_forms ADD COLUMN IF NOT EXISTS response_count INTEGER DEFAULT 0;
 
