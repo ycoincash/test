@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { updateUserPhoneNumber, adminUpdateUserPhoneNumber } from '../actions';
 import { useAuthContext } from '@/hooks/useAuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { phoneCountryCodes } from '@/lib/countries';
 
 // Define a custom labels object for react-phone-number-input
 import ar from 'react-phone-number-input/locale/ar.json'
@@ -27,7 +28,7 @@ function PhoneVerificationForm() {
     const [defaultCountry, setDefaultCountry] = useState<string>('SA');
     const targetUserId = searchParams.get('userId');
     // Only admin mode if user is actually an admin AND targetUserId differs from current user
-    const isAdminMode = user?.profile?.admin && targetUserId && targetUserId !== user?.id;
+    const isAdminMode = user?.profile?.role === 'admin' && targetUserId && targetUserId !== user?.id;
     
     useEffect(() => {
         if (!targetUserId && !user) {
@@ -133,7 +134,7 @@ function PhoneVerificationForm() {
                             value={phoneNumber}
                             onChange={setPhoneNumber}
                             className="w-full"
-                            countries={['SA', 'AE', 'KW', 'QA', 'BH', 'OM', 'EG', 'JO', 'LB', 'IQ', 'SY', 'YE', 'PS', 'SD', 'TN', 'DZ', 'MA', 'LY', 'MR', 'US', 'GB', 'TR', 'ID', 'MY']}
+                            countries={phoneCountryCodes as any}
                         />
                     </div>
                     

@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { uploadVerificationDocument } from '@/app/actions/upload';
 import { Progress } from '@/components/ui/progress';
 import Image from 'next/image';
+import { countries as allCountries } from '@/lib/countries';
 
 const kycSchema = z.object({
   documentType: z.enum(['id_card', 'passport', 'driver_license'], { required_error: 'نوع الوثيقة مطلوب' }),
@@ -29,18 +30,11 @@ interface KycVerificationFormProps {
   userCountry?: string | null;
 }
 
-const countries = [
-  { value: 'SA', label: 'السعودية', flag: '🇸🇦' },
-  { value: 'AE', label: 'الإمارات', flag: '🇦🇪' },
-  { value: 'EG', label: 'مصر', flag: '🇪🇬' },
-  { value: 'YE', label: 'اليمن', flag: '🇾🇪' },
-  { value: 'JO', label: 'الأردن', flag: '🇯🇴' },
-  { value: 'LB', label: 'لبنان', flag: '🇱🇧' },
-  { value: 'KW', label: 'الكويت', flag: '🇰🇼' },
-  { value: 'QA', label: 'قطر', flag: '🇶🇦' },
-  { value: 'BH', label: 'البحرين', flag: '🇧🇭' },
-  { value: 'OM', label: 'عمان', flag: '🇴🇲' },
-];
+const countries = allCountries.map(c => ({
+  value: c.code,
+  label: c.nameAr || c.name,
+  flag: c.flag || ''
+}));
 
 export function KycVerificationForm({ onSuccess, onCancel, userCountry }: KycVerificationFormProps) {
   const [step, setStep] = useState(1);

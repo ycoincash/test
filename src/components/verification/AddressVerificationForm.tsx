@@ -12,6 +12,14 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Upload, FileText, CheckCircle2, Loader2, AlertCircle, Home } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { uploadVerificationDocument } from '@/app/actions/upload';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { countries as allCountries } from '@/lib/countries';
+
+const countries = allCountries.map(c => ({
+  value: c.code,
+  label: c.nameAr || c.name,
+  flag: c.flag || ''
+}));
 
 const addressSchema = z.object({
   country: z.string().min(2, 'الدولة مطلوبة'),
@@ -138,9 +146,30 @@ export function AddressVerificationForm({ onSuccess, onCancel, userCountry }: Ad
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>الدولة *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="مثال: المملكة العربية السعودية" {...field} />
-                      </FormControl>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="اختر الدولة">
+                              {field.value && (
+                                <span className="flex items-center gap-2">
+                                  <span>{countries.find(c => c.value === field.value)?.flag}</span>
+                                  <span>{countries.find(c => c.value === field.value)?.label}</span>
+                                </span>
+                              )}
+                            </SelectValue>
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="max-h-[300px]">
+                          {countries.map((country) => (
+                            <SelectItem key={country.value} value={country.value}>
+                              <div className="flex items-center gap-2">
+                                <span>{country.flag}</span>
+                                <span>{country.label}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
