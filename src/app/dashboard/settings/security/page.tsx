@@ -48,12 +48,66 @@ export default function SecurityPage() {
     });
 
     const handlePasswordSubmit = async (values: PasswordFormValues) => {
-        // This is a UI demonstration. Real implementation would require re-authentication.
         setIsPasswordSubmitting(true);
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        toast({ type: "success", title: "تم تحديث كلمة المرور", description: "تم تغيير كلمة المرور بنجاح." });
-        passwordForm.reset();
-        setIsPasswordSubmitting(false);
+        
+        try {
+            const { createClient } = await import('@/lib/supabase/client');
+            const supabase = createClient();
+            
+            const { data: { user } } = await supabase.auth.getUser();
+            
+            if (!user?.email) {
+                toast({ 
+                    variant: "destructive", 
+                    title: "خطأ", 
+                    description: "لم يتم العثور على المستخدم." 
+                });
+                return;
+            }
+
+            const { error: signInError } = await supabase.auth.signInWithPassword({
+                email: user.email,
+                password: values.currentPassword,
+            });
+
+            if (signInError) {
+                toast({ 
+                    variant: "destructive", 
+                    title: "خطأ", 
+                    description: "كلمة المرور الحالية غير صحيحة." 
+                });
+                return;
+            }
+
+            const { error: updateError } = await supabase.auth.updateUser({
+                password: values.newPassword,
+            });
+
+            if (updateError) {
+                toast({ 
+                    variant: "destructive", 
+                    title: "خطأ", 
+                    description: "فشل تحديث كلمة المرور. حاول مرة أخرى." 
+                });
+                return;
+            }
+
+            toast({ 
+                title: "تم بنجاح!", 
+                description: "تم تحديث كلمة المرور بنجاح." 
+            });
+            
+            passwordForm.reset();
+        } catch (error: any) {
+            console.error('Password change error:', error);
+            toast({ 
+                variant: "destructive", 
+                title: "خطأ", 
+                description: "حدث خطأ غير متوقع." 
+            });
+        } finally {
+            setIsPasswordSubmitting(false);
+        }
     };
 
     return (
