@@ -22,7 +22,6 @@ export function AddressSimpleUpload({ onSuccess, onCancel }: AddressSimpleUpload
   const [streetAddress, setStreetAddress] = useState('');
   const [stateProvince, setStateProvince] = useState('');
   const [postalCode, setPostalCode] = useState('');
-  const [documentType, setDocumentType] = useState<string>('');
   
   // File upload
   const [documentFile, setDocumentFile] = useState<File | null>(null);
@@ -49,12 +48,6 @@ export function AddressSimpleUpload({ onSuccess, onCancel }: AddressSimpleUpload
     { code: 'OM', name: 'عمان', flag: '🇴🇲' },
   ];
 
-  const documentTypes = [
-    { value: 'utility_bill', label: 'فاتورة المرافق (كهرباء، ماء، غاز)', icon: '⚡' },
-    { value: 'bank_statement', label: 'كشف حساب بنكي', icon: '🏦' },
-    { value: 'rental_agreement', label: 'عقد إيجار', icon: '📄' },
-    { value: 'government_letter', label: 'خطاب حكومي', icon: '🏛️' },
-  ];
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -75,7 +68,7 @@ export function AddressSimpleUpload({ onSuccess, onCancel }: AddressSimpleUpload
   };
 
   const handleNextStep = () => {
-    if (!country || !city || !streetAddress || !postalCode || !documentType) {
+    if (!country || !city || !streetAddress || !postalCode) {
       toast({
         variant: 'destructive',
         title: 'خطأ',
@@ -140,7 +133,6 @@ export function AddressSimpleUpload({ onSuccess, onCancel }: AddressSimpleUpload
           streetAddress,
           stateProvince,
           postalCode,
-          documentType,
           documentUrl,
         }),
       });
@@ -240,37 +232,13 @@ export function AddressSimpleUpload({ onSuccess, onCancel }: AddressSimpleUpload
             />
           </div>
 
-          {/* Document Type Selection */}
-          <div className="space-y-3">
-            <Label>نوع مستند إثبات العنوان *</Label>
-            <div className="grid grid-cols-1 gap-3">
-              {documentTypes.map((type) => (
-                <button
-                  key={type.value}
-                  type="button"
-                  onClick={() => setDocumentType(type.value)}
-                  className={`p-4 border-2 rounded-lg text-right transition-colors ${
-                    documentType === type.value 
-                      ? 'border-primary bg-primary/10' 
-                      : 'border-border hover:border-primary/50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-lg">{type.icon}</span>
-                    <p className="font-medium">{type.label}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
           <div className="flex gap-3 pt-4">
             <Button variant="outline" onClick={onCancel} className="flex-1">
               إلغاء
             </Button>
             <Button 
               onClick={handleNextStep} 
-              disabled={!country || !city || !streetAddress || !postalCode || !documentType}
+              disabled={!country || !city || !streetAddress || !postalCode}
               className="flex-1"
             >
               التالي
@@ -288,7 +256,7 @@ export function AddressSimpleUpload({ onSuccess, onCancel }: AddressSimpleUpload
       <div className="text-center space-y-2">
         <h2 className="text-2xl font-bold">رفع مستند إثبات العنوان</h2>
         <p className="text-muted-foreground">
-          قم برفع صورة واضحة للمستند (لا يزيد عمره عن 3 أشهر)
+          قم برفع فاتورة مرافق، كشف بنكي، أو أي مستند رسمي يثبت عنوانك (لا يزيد عمره عن 3 أشهر)
         </p>
       </div>
 
