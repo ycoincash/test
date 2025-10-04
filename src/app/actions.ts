@@ -223,7 +223,7 @@ export async function getActiveFeedbackFormForUser(): Promise<FeedbackForm | nul
     const { data: activeForms, error: formsError } = await supabase
         .from('feedback_forms')
         .select('*')
-        .eq('status', 'active')
+        .eq('is_active', true)
         .order('created_at', { ascending: false });
     
     if (formsError || !activeForms || activeForms.length === 0) {

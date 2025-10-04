@@ -62,6 +62,19 @@ The following environment variables must be configured in Replit Secrets:
 - **Build Command:** `npm run build`
 - **Run Command:** `npm start`
 
+### Database Schema Validation
+**Automated Validation Script:** `scripts/validate-database-schema.sh`
+- Run before deploying to catch schema mismatches
+- Validates that code expectations match database reality
+- Checks critical tables and column names
+- **Key Schema Rules:**
+  - `feedback_forms` uses `is_active` (boolean), NOT `status`
+  - `offers` uses `is_enabled` (boolean), NOT `is_active`
+  - `users`, `trading_accounts`, `withdrawals` use `status` (enum)
+  - `blog_posts`, `orders` use `status` (text)
+
+**Run validation:** `bash scripts/validate-database-schema.sh`
+
 ### Recent Changes
 - **2025-10-04:** KYC Verification Form Redesign - Simplified 2-Step Flow
   - Redesigned KYC verification form with minimal user friction (2 steps only)
