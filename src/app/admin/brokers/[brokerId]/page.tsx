@@ -103,7 +103,7 @@ const formSchema = z.object({
   cashback: z.object({
       affiliate_program_link: z.string().url("يجب أن يكون رابطًا صالحًا.").or(z.literal("")).optional().default(""),
       cashback_account_type: z.array(z.string()).optional().default([]),
-      cashback_frequency: z.string().optional().default(""),
+      cashback_frequency: z.enum(['Daily', 'Weekly', 'Monthly']).default('Daily'),
       rebate_method: z.array(z.string()).optional().default([]),
       cashback_per_lot: z.coerce.number().min(0).optional().default(0),
   }),
@@ -149,7 +149,7 @@ const getSafeDefaultValues = (broker?: Broker | null): BrokerFormValues => {
         platforms: { platforms_supported: [], mt4_license_type: 'None', mt5_license_type: 'None', custom_platform: false },
         instruments: { forex_pairs: "", crypto_trading: false, stocks: false, commodities: false, indices: false },
         depositsWithdrawals: { payment_methods: [], min_withdrawal: 0, withdrawal_speed: "", deposit_fees: false, withdrawal_fees: false },
-        cashback: { affiliate_program_link: "", cashback_account_type: [], cashback_frequency: "", rebate_method: [], cashback_per_lot: 0 },
+        cashback: { affiliate_program_link: "", cashback_account_type: [], cashback_frequency: "Daily", rebate_method: [], cashback_per_lot: 0 },
         globalReach: { business_region: [], global_presence: "", languages_supported: [], customer_support_channels: [] },
         reputation: { wikifx_score: 0, trustpilot_rating: 0, reviews_count: 0, verified_users: 0 },
         additionalFeatures: { swap_free: false, education_center: false, copy_trading: false, demo_account: false, trading_contests: false, regulatory_alerts: "", welcome_bonus: false },
