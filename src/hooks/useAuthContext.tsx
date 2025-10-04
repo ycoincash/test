@@ -1,14 +1,11 @@
-
 "use client";
 
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
-import { onAuthStateChanged, User as FirebaseAuthUser } from 'firebase/auth';
-import { auth, db } from '@/lib/firebase/config';
-import { doc, getDoc, Timestamp } from 'firebase/firestore';
+import { createClient } from '@/lib/supabase/client';
 import type { UserProfile } from '@/types';
+import type { User } from '@supabase/supabase-js';
 
-// Extend the user object to include the profile
-export interface AppUser extends FirebaseAuthUser {
+export interface AppUser extends User {
     profile?: UserProfile;
 }
 
@@ -27,56 +24,96 @@ const AuthContext = createContext<AuthContextType>({
 const safeToDate = (timestamp: any): Date | undefined => {
     if (!timestamp) return undefined;
     if (timestamp instanceof Date) return timestamp;
-    if (timestamp.toDate) return timestamp.toDate();
+    if (typeof timestamp === 'string') return new Date(timestamp);
     return undefined;
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AppUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const supabase = createClient();
 
-  const fetchUserData = useCallback(async (firebaseUser: FirebaseAuthUser) => {
-    if (!firebaseUser) {
+  const fetchUserData = useCallback(async (supabaseUser: User) => {
+    if (!supabaseUser) {
         setUser(null);
         setIsLoading(false);
         return;
     }
     try {
-        const userDocRef = doc(db, 'users', firebaseUser.uid);
-        const userDocSnap = await getDoc(userDocRef);
+        const { data: userProfile, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', supabaseUser.id)
+            .single();
         
-        let userProfile: UserProfile | undefined = undefined;
+        let profile: UserProfile | undefined = undefined;
         
-        if (userDocSnap.exists()) {
-            const data = userDocSnap.data();
-            userProfile = {
-                uid: firebaseUser.uid,
-                ...data,
-                createdAt: safeToDate(data.createdAt),
-                kycData: data.kycData ? { ...data.kycData, submittedAt: safeToDate(data.kycData.submittedAt) } : undefined,
-                addressData: data.addressData ? { ...data.addressData, submittedAt: safeToDate(data.addressData.submittedAt) } : undefined,
+        if (!error && userProfile) {
+            profile = {
+                uid: supabaseUser.id,
+                email: userProfile.email,
+                name: userProfile.name,
+                role: userProfile.role,
+                clientId: userProfile.client_id,
+                createdAt: safeToDate(userProfile.created_at),
+                country: userProfile.country,
+                isVerified: userProfile.is_verified,
+                status: userProfile.status,
+                phoneNumber: userProfile.phone_number,
+                phoneNumberVerified: userProfile.phone_number_verified,
+                referralCode: userProfile.referral_code,
+                referredBy: userProfile.referred_by,
+                referrals: [], // Will be calculated from referrals query if needed
+                level: userProfile.level,
+                monthlyEarnings: userProfile.monthly_earnings,
+                kycData: userProfile.kyc_document_type ? {
+                    documentType: userProfile.kyc_document_type,
+                    documentNumber: userProfile.kyc_document_number,
+                    gender: userProfile.kyc_gender,
+                    status: userProfile.kyc_status,
+                    submittedAt: safeToDate(userProfile.kyc_submitted_at),
+                    rejectionReason: userProfile.kyc_rejection_reason,
+                } : undefined,
+                addressData: userProfile.address_country ? {
+                    country: userProfile.address_country,
+                    city: userProfile.address_city,
+                    streetAddress: userProfile.address_street,
+                    status: userProfile.address_status,
+                    submittedAt: safeToDate(userProfile.address_submitted_at),
+                    rejectionReason: userProfile.address_rejection_reason,
+                } : undefined,
             } as UserProfile;
         }
 
         setUser({ 
-            ...firebaseUser, 
-            profile: userProfile,
+            ...supabaseUser, 
+            profile: profile,
         });
 
     } catch (error) {
         console.error("Error fetching user data:", error);
-        setUser(firebaseUser); // Fallback to just firebase user
+        setUser(supabaseUser as AppUser);
     } finally {
         setIsLoading(false);
     }
-  }, []);
-
+  }, [supabase]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        fetchUserData(session.user);
+      } else {
+        setUser(null);
+        setIsLoading(false);
+      }
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsLoading(true);
-      if (firebaseUser) {
-        fetchUserData(firebaseUser);
+      if (session?.user) {
+        fetchUserData(session.user);
       } else {
         setUser(null);
         setIsLoading(false);
@@ -84,25 +121,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     // Custom event to trigger a refetch
-    const handleRefetch = () => {
-        if(auth.currentUser) {
-            fetchUserData(auth.currentUser);
+    const handleRefetch = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if(session?.user) {
+            fetchUserData(session.user);
         }
     };
     window.addEventListener('refetchUser', handleRefetch);
 
     return () => {
-        unsubscribe();
+        subscription.unsubscribe();
         window.removeEventListener('refetchUser', handleRefetch);
     };
-  }, [fetchUserData]);
+  }, [fetchUserData, supabase]);
   
-  const refetchUserData = useCallback(() => {
-      if(auth.currentUser) {
+  const refetchUserData = useCallback(async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if(session?.user) {
           setIsLoading(true);
-          fetchUserData(auth.currentUser);
+          fetchUserData(session.user);
       }
-  }, [fetchUserData]);
+  }, [fetchUserData, supabase]);
 
   return (
     <AuthContext.Provider value={{ user, isLoading, refetchUserData }}>
