@@ -43,23 +43,7 @@ export default function LoginPage() {
   const { toast } = useToast();
 
   const handleLoginSuccess = async (userId: string) => {
-    const supabase = createClient();
-    
-    const { data: userProfile, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', userId)
-      .single();
-
-    if (error || !userProfile) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to load user profile. Please try again.",
-      });
-      return;
-    }
-
+    // Trigger user data refetch
     window.dispatchEvent(new CustomEvent('refetchUser'));
 
     toast({
@@ -68,16 +52,11 @@ export default function LoginPage() {
       description: "Logged in successfully.",
     });
 
-    if (!userProfile.phone_number) {
-      router.push(`/phone-verification?userId=${userId}`);
-      return;
-    }
+    // Small delay to let auth context update
+    await new Promise(resolve => setTimeout(resolve, 500));
 
-    if (userProfile.role === 'admin') {
-      router.push('/admin/dashboard');
-    } else {
-      router.push('/dashboard');
-    }
+    // Default redirect to dashboard - the middleware will handle proper routing
+    router.push('/dashboard');
   }
 
   const handleEmailLogin = async (e: React.FormEvent) => {
