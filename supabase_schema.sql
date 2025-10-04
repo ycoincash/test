@@ -519,7 +519,7 @@ CREATE POLICY "Banner settings are publicly readable" ON banner_settings
 ALTER TABLE offers ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Enabled offers are publicly readable" ON offers;
 CREATE POLICY "Enabled offers are publicly readable" ON offers
-    FOR SELECT USING (is_active = true);
+    FOR SELECT USING (is_enabled = true);
 
 ALTER TABLE admin_notifications ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Admin notifications are admin only" ON admin_notifications;
@@ -536,8 +536,8 @@ VALUES ('contact', '', '', '', '{}')
 ON CONFLICT (id) DO NOTHING;
 
 -- Insert default banner settings
-INSERT INTO banner_settings (id, is_enabled, message, type, link)
-VALUES ('banner', false, '', 'info', '')
+INSERT INTO banner_settings (id, is_enabled, type, title, text, cta_text, cta_link)
+VALUES ('banner', false, 'text', '', '', '', '')
 ON CONFLICT (id) DO NOTHING;
 
 -- Seed client levels
