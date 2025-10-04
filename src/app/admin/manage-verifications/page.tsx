@@ -16,6 +16,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { DataTable } from "@/components/data-table/data-table";
 import { getColumns } from "./columns";
+import { DocumentViewer } from "@/components/admin/manage-verifications/DocumentViewer";
 
 const rejectReasonSchema = z.object({
     reason: z.string().min(10, "سبب الرفض مطلوب."),
@@ -80,6 +81,7 @@ export default function ManageVerificationsPage() {
     const [isLoading, setIsLoading] = useState(true);
     const { toast } = useToast();
     const [dialogState, setDialogState] = useState<{ isOpen: boolean; data: { userId: string, type: 'kyc' | 'address' | 'phone' } | null }>({ isOpen: false, data: null });
+    const [documentViewer, setDocumentViewer] = useState<{ isOpen: boolean; request: PendingVerification | null }>({ isOpen: false, request: null });
 
     const fetchRequests = async () => {
         setIsLoading(true);
@@ -111,7 +113,11 @@ export default function ManageVerificationsPage() {
         setDialogState({ isOpen: true, data: { userId, type: type.toLowerCase() as 'kyc' | 'address' | 'phone' } });
     }
 
-    const columns = getColumns(handleApprove, handleRejectRequest);
+    const handleViewDocuments = (request: PendingVerification) => {
+        setDocumentViewer({ isOpen: true, request });
+    }
+
+    const columns = getColumns(handleApprove, handleRejectRequest, handleViewDocuments);
 
     if (isLoading) {
         return (
@@ -137,6 +143,17 @@ export default function ManageVerificationsPage() {
                     type={dialogState.data.type}
                     userId={dialogState.data.userId}
                     onSuccess={fetchRequests}
+                />
+            )}
+
+            {documentViewer.isOpen && documentViewer.request && (
+                <DocumentViewer
+                    isOpen={documentViewer.isOpen}
+                    onClose={() => setDocumentViewer({ isOpen: false, request: null })}
+                    type={documentViewer.request.type}
+                    data={documentViewer.request.data}
+                    userName={documentViewer.request.userName}
+                    userEmail={documentViewer.request.userEmail}
                 />
             )}
         </div>

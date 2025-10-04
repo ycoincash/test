@@ -4,7 +4,7 @@
 import { ColumnDef } from "@tanstack/react-table"
 import { format } from 'date-fns'
 import Link from 'next/link'
-import { MoreHorizontal, FileText, Home, Phone, User, Check, X } from "lucide-react"
+import { MoreHorizontal, FileText, Home, Phone, User, Check, X, Eye } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -41,7 +41,8 @@ const getTypeInfo = (type: PendingVerification['type']) => {
 
 export const getColumns = (
   handleApprove: (userId: string, type: PendingVerification['type']) => void,
-  handleRejectRequest: (userId: string, type: PendingVerification['type']) => void
+  handleRejectRequest: (userId: string, type: PendingVerification['type']) => void,
+  handleViewDocuments: (request: PendingVerification) => void
 ): ColumnDef<PendingVerification>[] => [
   {
     accessorKey: 'userName',
@@ -79,6 +80,8 @@ export const getColumns = (
     id: 'actions',
     cell: ({ row }) => {
       const request = row.original;
+      const canViewDocuments = request.type === 'KYC' || request.type === 'Address';
+      
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -89,6 +92,15 @@ export const getColumns = (
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
+            {canViewDocuments && (
+              <>
+                <DropdownMenuItem onClick={() => handleViewDocuments(request)}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  عرض المستندات
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            )}
             <DropdownMenuItem onClick={() => handleApprove(request.userId, request.type)}>
               <Check className="mr-2 h-4 w-4" />
               موافقة
