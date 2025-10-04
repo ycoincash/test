@@ -62,7 +62,7 @@ export function AddressVerificationForm({ onSuccess, onCancel, userCountry }: Ad
         setDocumentPreview(reader.result as string);
       };
       reader.readAsDataURL(file);
-      form.setValue('documentFile', file);
+      form.setValue('documentFile', file, { shouldValidate: false });
     }
   };
 

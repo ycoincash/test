@@ -45,7 +45,7 @@ export function KycVerificationForm({ onSuccess, onCancel, userCountry }: KycVer
 
   const form = useForm<KycFormValues>({
     resolver: zodResolver(kycSchema),
-    mode: 'onChange',
+    mode: 'onBlur',
     defaultValues: {
       documentType: undefined,
       nationality: userCountry || '',
@@ -69,7 +69,7 @@ export function KycVerificationForm({ onSuccess, onCancel, userCountry }: KycVer
         }
       };
       reader.readAsDataURL(file);
-      form.setValue(field, file);
+      form.setValue(field, file, { shouldValidate: false });
     }
   };
 
