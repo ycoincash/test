@@ -452,46 +452,57 @@ CREATE POLICY "Users can read own feedback responses" ON feedback_responses
     FOR SELECT USING (auth.uid() = user_id);
 
 -- Public read access for certain tables
+ALTER TABLE brokers ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Brokers are publicly readable" ON brokers;
 CREATE POLICY "Brokers are publicly readable" ON brokers
     FOR SELECT USING (true);
 
+ALTER TABLE payment_methods ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Payment methods are publicly readable" ON payment_methods;
 CREATE POLICY "Payment methods are publicly readable" ON payment_methods
     FOR SELECT USING (is_enabled = true);
 
+ALTER TABLE product_categories ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Product categories are publicly readable" ON product_categories;
 CREATE POLICY "Product categories are publicly readable" ON product_categories
     FOR SELECT USING (true);
 
+ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Products are publicly readable" ON products;
 CREATE POLICY "Products are publicly readable" ON products
     FOR SELECT USING (true);
 
+ALTER TABLE blog_posts ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Published blog posts are publicly readable" ON blog_posts;
 CREATE POLICY "Published blog posts are publicly readable" ON blog_posts
     FOR SELECT USING (status = 'published');
 
+ALTER TABLE client_levels ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Client levels are publicly readable" ON client_levels;
 CREATE POLICY "Client levels are publicly readable" ON client_levels
     FOR SELECT USING (true);
 
+ALTER TABLE feedback_forms ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Active feedback forms are publicly readable" ON feedback_forms;
 CREATE POLICY "Active feedback forms are publicly readable" ON feedback_forms
     FOR SELECT USING (is_active = true);
 
+ALTER TABLE contact_settings ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Contact settings are publicly readable" ON contact_settings;
 CREATE POLICY "Contact settings are publicly readable" ON contact_settings
     FOR SELECT USING (true);
 
+ALTER TABLE banner_settings ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Banner settings are publicly readable" ON banner_settings;
 CREATE POLICY "Banner settings are publicly readable" ON banner_settings
     FOR SELECT USING (true);
 
+ALTER TABLE offers ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Enabled offers are publicly readable" ON offers;
 CREATE POLICY "Enabled offers are publicly readable" ON offers
     FOR SELECT USING (is_active = true);
 
+ALTER TABLE admin_notifications ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Admin notifications are admin only" ON admin_notifications;
 CREATE POLICY "Admin notifications are admin only" ON admin_notifications
     FOR ALL USING (
