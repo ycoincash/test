@@ -61,6 +61,7 @@ export function KycVerificationForm({ onSuccess, onCancel, userCountry }: KycVer
     file: File | undefined,
     field: 'documentFrontFile' | 'documentBackFile' | 'selfieFile'
   ) => {
+    console.log('📁 File changed:', field, file?.name, file?.size);
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -73,7 +74,8 @@ export function KycVerificationForm({ onSuccess, onCancel, userCountry }: KycVer
         }
       };
       reader.readAsDataURL(file);
-      form.setValue(field, file, { shouldValidate: false });
+      form.setValue(field, file, { shouldValidate: true });
+      console.log('✅ File set in form:', field);
     }
   };
 
@@ -238,7 +240,13 @@ export function KycVerificationForm({ onSuccess, onCancel, userCountry }: KycVer
       </div>
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={(e) => {
+          console.log('📝 Form submit event triggered');
+          e.preventDefault();
+          console.log('🔍 Form values:', form.getValues());
+          console.log('🔍 Form errors:', form.formState.errors);
+          form.handleSubmit(onSubmit)(e);
+        }} className="space-y-6">
           {step === 1 && (
             <div className="space-y-6">
               <div className="text-center mb-8">
