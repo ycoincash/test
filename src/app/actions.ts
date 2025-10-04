@@ -1,24 +1,17 @@
-
 'use server';
 
 import { generateProjectSummary } from "@/ai/flows/generate-project-summary";
 import type { GenerateProjectSummaryOutput } from "@/ai/flows/generate-project-summary";
 import { calculateCashback } from "@/ai/flows/calculate-cashback";
 import type { CalculateCashbackInput, CalculateCashbackOutput } from "@/ai/flows/calculate-cashback";
-import { auth, db } from "@/lib/firebase/config";
-import { adminDb } from '@/lib/firebase/admin-config';
-import { FieldValue } from 'firebase-admin/firestore';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { getAuthenticatedUser } from '@/lib/auth/server-auth';
-import * as admin from 'firebase-admin';
-import { createUserWithEmailAndPassword, signOut, sendPasswordResetEmail, deleteUser } from "firebase/auth";
-import { doc, setDoc, Timestamp, getDocs, collection, query, where, runTransaction, arrayUnion, writeBatch, increment, getDoc, updateDoc, addDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
 import { generateReferralCode } from "@/lib/referral";
 import { logUserActivity } from "./admin/actions";
 import { getClientSessionInfo } from "@/lib/device-info";
 import { getCountryFromHeaders } from "@/lib/server-geo";
 import type { Order, Product, ProductCategory, CashbackTransaction, KycData, AddressData, FeedbackForm, ClientLevel, Notification, FeedbackResponse, Withdrawal, TradingAccount, UserProfile, BlogPost, DeviceInfo, GeoInfo } from "@/types";
 
-// Hardcoded data based on https://github.com/tcb4dev/cashback1
 const projectData = {
     projectDescription: "A cashback calculation system in Go that processes customer transactions. It determines cashback rewards based on a set of configurable rules, including handling for blacklisted Merchant Category Codes (MCCs). The system is exposed via a RESTful API.",
     architectureDetails: "The project is a single microservice built in Go. It exposes a REST API for calculating cashback. The core logic is encapsulated within a rules engine that evaluates transactions against a list of rules to determine the final cashback amount. It has handlers for different API endpoints, and a main function to set up the server.",
@@ -40,7 +33,6 @@ export async function handleGenerateSummary(): Promise<{ summary: string | null;
     }
 }
 
-
 export async function handleCalculateCashback(input: CalculateCashbackInput): Promise<{ result: CalculateCashbackOutput | null; error: string | null }> {
     try {
         const result: CalculateCashbackOutput = await calculateCashback(input);
@@ -60,15 +52,20 @@ export async function handleRegisterUser(formData: { name: string, email: string
     
     let referrerId: string | null = null;
 
-    // Validate referral code using Admin SDK (bypasses Firestore rules)
+    const supabaseAdmin = await createAdminClient();
+
     if (referralCode) {
         try {
-            const usersQuery = adminDb.collection('users').where('referralCode', '==', referralCode);
-            const querySnapshot = await usersQuery.get();
-            if (querySnapshot.empty) {
+            const { data: referrerData, error } = await supabaseAdmin
+                .from('users')
+                .select('id')
+                .eq('referral_code', referralCode)
+                .single();
+            
+            if (error || !referrerData) {
                 return { success: false, error: "The referral code you entered is not valid." };
             }
-            referrerId = querySnapshot.docs[0].id;
+            referrerId = referrerData.id;
         } catch (error) {
             console.error("Error validating referral code:", error);
             return { success: false, error: "Failed to validate referral code." };
@@ -77,79 +74,58 @@ export async function handleRegisterUser(formData: { name: string, email: string
 
     const detectedCountry = await getCountryFromHeaders();
 
-    let userCredential;
     try {
-        // Create Firebase Auth user
-        userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
+        const { data: authData, error: signUpError } = await supabaseAdmin.auth.admin.createUser({
+            email,
+            password,
+            email_confirm: true,
+        });
 
-        // Use Admin SDK transaction for atomic counter increment and user creation
-        const newClientId = await adminDb.runTransaction(async (transaction) => {
-            const counterRef = adminDb.collection('counters').doc('userCounter');
-            const counterSnap = await transaction.get(counterRef);
-            const lastId = counterSnap.exists ? (counterSnap.data()?.lastId || 100000) : 100000;
-            const clientId = lastId + 1;
+        if (signUpError || !authData.user) {
+            console.error("Supabase Auth Error:", signUpError);
+            if (signUpError?.message?.includes('already registered')) {
+                return { success: false, error: "This email is already in use. Please log in." };
+            }
+            return { success: false, error: "An unexpected error occurred during registration. Please try again." };
+        }
 
-            // Create user document
-            const userRef = adminDb.collection('users').doc(user.uid);
-            transaction.set(userRef, {
+        const userId = authData.user.id;
+
+        const { data: userData, error: insertError } = await supabaseAdmin
+            .from('users')
+            .insert({
+                id: userId,
                 name,
                 email,
-                clientId,
-                role: "user",
-                status: "NEW",
-                createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                referralCode: generateReferralCode(name),
-                referredBy: referrerId,
-                referrals: [],
+                role: 'user',
+                status: 'active',
+                created_at: new Date().toISOString(),
+                referral_code: generateReferralCode(name),
+                referred_by: referrerId,
                 level: 1,
-                monthlyEarnings: 0,
+                monthly_earnings: 0,
                 country: detectedCountry,
-            });
+            })
+            .select()
+            .single();
 
-            // Update referrer's referrals array if applicable
-            if (referrerId) {
-                const referrerRef = adminDb.collection('users').doc(referrerId);
-                transaction.update(referrerRef, {
-                    referrals: admin.firestore.FieldValue.arrayUnion(user.uid)
-                });
-            }
+        if (insertError) {
+            await supabaseAdmin.auth.admin.deleteUser(userId);
+            console.error("Error creating user record:", insertError);
+            return { success: false, error: "An unexpected error occurred during registration. Please try again." };
+        }
 
-            // Update counter atomically
-            transaction.set(counterRef, { lastId: clientId }, { merge: true });
-
-            return clientId;
-        });
         
-        return { success: true, userId: user.uid };
+        return { success: true, userId: userId };
 
     } catch (error: any) {
-        // If user was created in Auth but Firestore operations failed, delete the user using Admin SDK
-        if (userCredential) {
-            try {
-                await admin.auth().deleteUser(userCredential.user.uid);
-            } catch (deleteError) {
-                console.error("Failed to delete user after registration failure:", deleteError);
-            }
-        }
-
         console.error("Registration Error:", error);
-        
-        if (error.code === 'auth/email-already-in-use') {
-            return { success: false, error: "This email is already in use. Please log in." };
-        }
-        
         return { success: false, error: "An unexpected error occurred during registration. Please try again." };
     }
 }
 
-
 export async function handleLogout() {
     try {
-        // Note: This is a server action that tells the client to call /api/logout
-        // The actual cookie clearing is handled by the authMiddleware
-        // This function exists to maintain compatibility with existing code
-        // The client should call /api/logout endpoint which the middleware manages
         return { success: true };
     } catch (error) {
         console.error("Logout Error: ", error);
@@ -157,145 +133,118 @@ export async function handleLogout() {
     }
 }
 
-
 export async function handleForgotPassword(email: string) {
     try {
-        await sendPasswordResetEmail(auth, email);
+        const supabase = await createClient();
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/reset-password`,
+        });
+        
+        if (error) {
+            console.error("Forgot Password Error: ", error);
+            return { success: false, error: "An unexpected error occurred. Please try again." };
+        }
+        
         return { success: true };
     } catch (error: any) {
         console.error("Forgot Password Error: ", error);
-        if (error.code === 'auth/user-not-found') {
-            return { success: false, error: "No user found with this email address." };
-        }
         return { success: false, error: "An unexpected error occurred. Please try again." };
     }
 }
 
-const safeToDate = (timestamp: any): Date | undefined => {
-    if (timestamp instanceof Timestamp) {
-        return timestamp.toDate();
-    }
-    if (timestamp && typeof timestamp.toDate === 'function') {
-        return timestamp.toDate();
-    }
-    return undefined;
-};
-
-function convertTimestamps(obj: any): any {
-    if (!obj) return obj;
-    if (obj instanceof Timestamp) {
-        return obj.toDate();
-    }
-    if (Array.isArray(obj)) {
-        return obj.map(item => convertTimestamps(item));
-    }
-    if (typeof obj === 'object') {
-        const newObj: { [key: string]: any } = {};
-        for (const key in obj) {
-            newObj[key] = convertTimestamps(obj[key]);
-        }
-        return newObj;
-    }
-    return obj;
-}
-
 export async function getClientLevels(): Promise<ClientLevel[]> {
-    const levelsCollection = collection(db, 'clientLevels');
-    const snapshot = await getDocs(levelsCollection);
-    if (snapshot.empty) {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+        .from('client_levels')
+        .select('*')
+        .order('id', { ascending: true });
+    
+    if (error) {
+        console.error("Error fetching client levels:", error);
         return [];
     }
-    const levelsArray = snapshot.docs.map(doc => ({
-        id: parseInt(doc.id, 10),
-        ...doc.data()
-    } as ClientLevel));
-    levelsArray.sort((a, b) => a.id - b.id);
-    return levelsArray;
+    
+    return data || [];
 }
 
 export async function getNotificationsForUser(): Promise<Notification[]> {
-    // Get authenticated user from session cookies
     const user = await getAuthenticatedUser();
     const userId = user.uid;
     
-    // Use Admin SDK to bypass Firestore rules (server-side only)
-    const querySnapshot = await adminDb.collection('notifications')
-        .where('userId', '==', userId)
-        .get();
+    const supabase = await createAdminClient();
+    const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
 
-    const notifications = querySnapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-            id: doc.id,
-            ...data,
-            createdAt: data.createdAt?.toDate() || new Date(),
-        } as Notification;
-    });
+    if (error) {
+        console.error("Error fetching notifications:", error);
+        return [];
+    }
 
-    notifications.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-    
-    return notifications;
+    return (data || []).map(item => ({
+        id: item.id,
+        userId: item.user_id,
+        message: item.message,
+        type: item.type,
+        isRead: item.is_read,
+        createdAt: new Date(item.created_at),
+        link: item.link,
+    }));
 }
 
 export async function markNotificationsAsRead(notificationIds: string[]) {
-    // Get authenticated user from session cookies
     const user = await getAuthenticatedUser();
     const userId = user.uid;
     
-    // Use Admin SDK batch for better reliability
-    const batch = adminDb.batch();
+    const supabase = await createAdminClient();
     
-    // Verify all notifications belong to the user before updating
-    const notificationRefs = notificationIds.map(id => 
-        adminDb.collection('notifications').doc(id)
-    );
+    const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('user_id', userId)
+        .in('id', notificationIds);
     
-    const notifications = await Promise.all(
-        notificationRefs.map(ref => ref.get())
-    );
-    
-    notifications.forEach((notifSnap, index) => {
-        if (notifSnap.exists && notifSnap.data()?.userId === userId) {
-            batch.update(notificationRefs[index], { isRead: true });
-        }
-    });
-    
-    await batch.commit();
+    if (error) {
+        console.error("Error marking notifications as read:", error);
+    }
 }
 
-
 export async function getActiveFeedbackFormForUser(): Promise<FeedbackForm | null> {
-    // Get authenticated user from session cookies
     const user = await getAuthenticatedUser();
     const userId = user.uid;
     
-    // Use Admin SDK to bypass Firestore rules (server-side only)
-    const activeFormsSnap = await adminDb.collection('feedbackForms')
-        .where('status', '==', 'active')
-        .get();
-    if (activeFormsSnap.empty) {
+    const supabase = await createAdminClient();
+    
+    const { data: activeForms, error: formsError } = await supabase
+        .from('feedback_forms')
+        .select('*')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+    
+    if (formsError || !activeForms || activeForms.length === 0) {
         return null;
     }
 
-    const activeForms = activeFormsSnap.docs.map(doc => {
-        const data = doc.data();
-        return {
-            id: doc.id,
-            ...data,
-            createdAt: data.createdAt?.toDate() || new Date(),
-        } as FeedbackForm;
-    });
+    const { data: userResponses, error: responsesError } = await supabase
+        .from('feedback_responses')
+        .select('form_id')
+        .eq('user_id', userId);
     
-    activeForms.sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime());
-
-    const userResponsesSnap = await adminDb.collection('feedbackResponses')
-        .where('userId', '==', userId)
-        .get();
-    const respondedFormIds = new Set(userResponsesSnap.docs.map(doc => doc.data().formId));
+    const respondedFormIds = new Set((userResponses || []).map(r => r.form_id));
 
     for (const form of activeForms) {
         if (!respondedFormIds.has(form.id)) {
-            return form;
+            return {
+                id: form.id,
+                title: form.title,
+                description: form.description || '',
+                questions: form.questions,
+                status: form.status,
+                createdAt: new Date(form.created_at),
+                responseCount: form.response_count || 0,
+            };
         }
     }
 
@@ -306,28 +255,41 @@ export async function submitFeedbackResponse(
     formId: string,
     answers: Record<string, any>
 ): Promise<{ success: boolean, message: string }> {
-    // Get authenticated user from session cookies
     const user = await getAuthenticatedUser();
     const userId = user.uid;
     
     try {
-        // Use Admin SDK for transaction
-        const db = adminDb;
+        const supabase = await createAdminClient();
         
-        await db.runTransaction(async (transaction) => {
-            const formRef = db.collection('feedbackForms').doc(formId);
-            const responseRef = db.collection('feedbackResponses').doc();
-
-            const responsePayload = {
-                formId,
-                userId,
-                submittedAt: new Date(),
+        const { error: insertError } = await supabase
+            .from('feedback_responses')
+            .insert({
+                form_id: formId,
+                user_id: userId,
+                submitted_at: new Date().toISOString(),
                 answers,
-            };
+            });
 
-            transaction.set(responseRef, responsePayload);
-            transaction.update(formRef, { responseCount: FieldValue.increment(1) });
-        });
+        if (insertError) {
+            throw insertError;
+        }
+
+        const { data: formData } = await supabase
+            .from('feedback_forms')
+            .select('response_count')
+            .eq('id', formId)
+            .single();
+
+        if (formData) {
+            const { error: updateError } = await supabase
+                .from('feedback_forms')
+                .update({ response_count: (formData.response_count || 0) + 1 })
+                .eq('id', formId);
+
+            if (updateError) {
+                console.error("Error updating response count:", updateError);
+            }
+        }
 
         return { success: true, message: "شكرا لملاحظاتك!" };
     } catch (error) {
@@ -335,55 +297,108 @@ export async function submitFeedbackResponse(
         return { success: false, message: "فشل إرسال الملاحظات." };
     }
 }
+
 export async function getProducts(): Promise<Product[]> {
-    const snapshot = await getDocs(query(collection(db, 'products')));
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+    const supabase = await createClient();
+    const { data, error } = await supabase
+        .from('products')
+        .select('*');
+    
+    if (error) {
+        console.error("Error fetching products:", error);
+        return [];
+    }
+    
+    return (data || []).map(item => ({
+        id: item.id,
+        name: item.name,
+        description: item.description,
+        price: item.price,
+        imageUrl: item.image_url,
+        categoryId: item.category_id,
+        categoryName: item.category_name,
+        stock: item.stock,
+    }));
 }
 
 export async function getCategories(): Promise<ProductCategory[]> {
-    const snapshot = await getDocs(query(collection(db, 'productCategories')));
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProductCategory));
+    const supabase = await createClient();
+    const { data, error } = await supabase
+        .from('product_categories')
+        .select('*');
+    
+    if (error) {
+        console.error("Error fetching categories:", error);
+        return [];
+    }
+    
+    return data || [];
 }
 
-// User function - gets user's own orders with ID token verification
 export async function getOrders(): Promise<Order[]> {
-    // Get authenticated user from session cookies
     const user = await getAuthenticatedUser();
     const userId = user.uid;
     
-    const ordersSnapshot = await adminDb.collection('orders')
-        .where('userId', '==', userId)
-        .get();
+    const supabase = await createAdminClient();
+    const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
     
-    const orders = ordersSnapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-            id: doc.id,
-            ...data,
-            createdAt: data.createdAt?.toDate() || new Date(),
-        } as Order;
-    });
+    if (error) {
+        console.error("Error fetching orders:", error);
+        return [];
+    }
     
-    // Sort by date client-side (avoids needing Firestore composite index)
-    orders.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-    return orders;
+    return (data || []).map(item => ({
+        id: item.id,
+        userId: item.user_id,
+        productId: item.product_id,
+        productName: item.product_name,
+        productImage: item.product_image,
+        price: item.product_price,
+        status: item.status,
+        createdAt: new Date(item.created_at),
+        userName: item.user_name,
+        userEmail: item.user_email,
+        deliveryPhoneNumber: item.delivery_phone_number,
+        referralCommissionAwarded: item.referral_commission_awarded,
+    }));
 }
 
 export async function getCashbackTransactions(): Promise<CashbackTransaction[]> {
-    // Get authenticated user from session cookies
     const user = await getAuthenticatedUser();
     const userId = user.uid;
     
-    // Use Admin SDK to bypass Firestore rules (server-side only)
-    const transactionsSnapshot = await adminDb.collection('cashbackTransactions')
-        .where('userId', '==', userId)
-        .get();
-    const userTransactions = transactionsSnapshot.docs.map(doc => {
-        const data = doc.data();
-        return { id: doc.id, ...data, date: data.date?.toDate() || new Date() } as CashbackTransaction;
-    });
-    userTransactions.sort((a, b) => b.date.getTime() - a.date.getTime());
-    return userTransactions;
+    const supabase = await createAdminClient();
+    const { data, error } = await supabase
+        .from('cashback_transactions')
+        .select('*')
+        .eq('user_id', userId)
+        .order('date', { ascending: false });
+    
+    if (error) {
+        console.error("Error fetching cashback transactions:", error);
+        return [];
+    }
+    
+    return (data || []).map(item => ({
+        id: item.id,
+        userId: item.user_id,
+        accountId: item.account_id,
+        accountNumber: item.account_number,
+        broker: item.broker,
+        date: new Date(item.date),
+        tradeDetails: item.trade_details,
+        cashbackAmount: item.cashback_amount,
+        referralBonusTo: item.referral_bonus_to,
+        referralBonusAmount: item.referral_bonus_amount,
+        sourceUserId: item.source_user_id,
+        sourceType: item.source_type,
+        transactionId: item.transaction_id,
+        note: item.note,
+    }));
 }
 
 export async function placeOrder(
@@ -391,86 +406,96 @@ export async function placeOrder(
     formData: { userName: string; userEmail: string; deliveryPhoneNumber: string },
     clientInfo: { deviceInfo: DeviceInfo, geoInfo: GeoInfo }
 ) {
-    // Get authenticated user from session cookies
     const user = await getAuthenticatedUser();
     const userId = user.uid;
     
     try {
-        // Use Admin SDK transaction for atomic balance checking and order creation
-        const result = await adminDb.runTransaction(async (transaction) => {
-            // Read user document first to create transactional contention (prevents double-spend)
-            const userRef = adminDb.collection('users').doc(userId);
-            const userSnap = await transaction.get(userRef);
-            if (!userSnap.exists) throw new Error("User not found.");
-            
-            // Get product
-            const productRef = adminDb.collection('products').doc(productId);
-            const productSnap = await transaction.get(productRef);
-            
-            if (!productSnap.exists) throw new Error("Product not found.");
-            const product = productSnap.data() as Product;
-            
-            if (product.stock <= 0) throw new Error("This product is currently out of stock.");
-            
-            // Atomically calculate available balance within transaction
-            const [transactionsSnap, withdrawalsSnap, ordersSnap] = await Promise.all([
-                transaction.get(adminDb.collection('cashbackTransactions').where('userId', '==', userId)),
-                transaction.get(adminDb.collection('withdrawals').where('userId', '==', userId)),
-                transaction.get(adminDb.collection('orders').where('userId', '==', userId).where('status', 'in', ['Pending', 'Shipped', 'Delivered']))
-            ]);
-            
-            const totalEarned = transactionsSnap.docs.reduce((sum, doc) => sum + doc.data().cashbackAmount, 0);
-            
-            let pendingWithdrawals = 0;
-            let completedWithdrawals = 0;
-            withdrawalsSnap.docs.forEach(doc => {
-                const withdrawal = doc.data() as Withdrawal;
-                if (withdrawal.status === 'Processing') {
-                    pendingWithdrawals += withdrawal.amount;
-                } else if (withdrawal.status === 'Completed') {
-                    completedWithdrawals += withdrawal.amount;
-                }
-            });
-            
-            const ordersTotal = ordersSnap.docs.reduce((sum, doc) => sum + doc.data().price, 0);
-            const availableBalance = totalEarned - completedWithdrawals - pendingWithdrawals - ordersTotal;
-            
-            if (availableBalance < product.price) {
-                throw new Error("You do not have enough available balance to purchase this item.");
+        const supabase = await createAdminClient();
+        
+        const { data: product, error: productError } = await supabase
+            .from('products')
+            .select('*')
+            .eq('id', productId)
+            .single();
+        
+        if (productError || !product) {
+            throw new Error("Product not found.");
+        }
+        
+        if (product.stock <= 0) {
+            throw new Error("This product is currently out of stock.");
+        }
+        
+        const { data: transactions } = await supabase
+            .from('cashback_transactions')
+            .select('cashback_amount')
+            .eq('user_id', userId);
+        
+        const { data: withdrawals } = await supabase
+            .from('withdrawals')
+            .select('amount, status')
+            .eq('user_id', userId);
+        
+        const { data: orders } = await supabase
+            .from('orders')
+            .select('product_price, status')
+            .eq('user_id', userId)
+            .in('status', ['Pending', 'Shipped', 'Delivered']);
+        
+        const totalEarned = (transactions || []).reduce((sum, t) => sum + t.cashback_amount, 0);
+        
+        let pendingWithdrawals = 0;
+        let completedWithdrawals = 0;
+        (withdrawals || []).forEach(w => {
+            if (w.status === 'Processing') {
+                pendingWithdrawals += w.amount;
+            } else if (w.status === 'Completed') {
+                completedWithdrawals += w.amount;
             }
-            
-            // Update product stock using FieldValue.increment for better concurrency
-            transaction.update(productRef, { stock: admin.firestore.FieldValue.increment(-1) });
-            
-            // Create order
-            const orderRef = adminDb.collection('orders').doc();
-            transaction.set(orderRef, {
-                userId: userId,
-                productId: productId,
-                productName: product.name,
-                productImage: product.imageUrl,
-                price: product.price,
-                status: 'Pending',
-                createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                userName: formData.userName,
-                userEmail: formData.userEmail,
-                deliveryPhoneNumber: formData.deliveryPhoneNumber,
-                referralCommissionAwarded: false,
-            });
-            
-            // Update user doc to create write contention (prevents concurrent double-spend)
-            transaction.update(userRef, { 
-                lastOrderAt: admin.firestore.FieldValue.serverTimestamp()
-            });
-            
-            return { orderId: orderRef.id, product };
         });
         
-        // Log activity after successful transaction (outside transaction to avoid retries)
+        const ordersTotal = (orders || []).reduce((sum, o) => sum + o.product_price, 0);
+        const availableBalance = totalEarned - completedWithdrawals - pendingWithdrawals - ordersTotal;
+        
+        if (availableBalance < product.price) {
+            throw new Error("You do not have enough available balance to purchase this item.");
+        }
+        
+        const { error: stockError } = await supabase
+            .from('products')
+            .update({ stock: product.stock - 1 })
+            .eq('id', productId);
+        
+        if (stockError) {
+            throw stockError;
+        }
+        
+        const { data: newOrder, error: orderError } = await supabase
+            .from('orders')
+            .insert({
+                user_id: userId,
+                product_id: productId,
+                product_name: product.name,
+                product_image: product.image_url,
+                product_price: product.price,
+                status: 'Pending',
+                created_at: new Date().toISOString(),
+                user_name: formData.userName,
+                user_email: formData.userEmail,
+                delivery_phone_number: formData.deliveryPhoneNumber,
+                referral_commission_awarded: false,
+            })
+            .select()
+            .single();
+        
+        if (orderError) {
+            throw orderError;
+        }
+        
         await logUserActivity(userId, 'store_purchase', clientInfo, { 
             productId, 
-            orderId: result.orderId,
-            price: result.product.price 
+            orderId: newOrder.id,
+            price: product.price 
         });
         
         return { success: true, message: 'تم تقديم الطلب بنجاح!' };
@@ -481,33 +506,28 @@ export async function placeOrder(
     }
 }
 
-
 export async function sendVerificationEmail(): Promise<{ success: boolean; error?: string }> {
-    const user = auth.currentUser;
-    if (user) {
-        try {
-            await auth.sendEmailVerification(user);
-            return { success: true };
-        } catch (error: any) {
-            return { success: false, error: error.message };
-        }
-    }
-    return { success: false, error: 'No user is signed in.' };
+    return { success: false, error: 'Email verification is handled by Supabase automatically.' };
 }
 
-
 export async function submitKycData(data: Omit<KycData, 'status' | 'submittedAt'>): Promise<{ success: boolean; error?: string }> {
-    // Get authenticated user from session cookies
     const user = await getAuthenticatedUser();
     const userId = user.uid;
     
     try {
-        const kycData: KycData = {
-            ...data,
-            status: 'Pending',
-            submittedAt: new Date(),
-        };
-        await adminDb.collection('users').doc(userId).update({ kycData });
+        const supabase = await createAdminClient();
+        const { error } = await supabase
+            .from('users')
+            .update({
+                kyc_document_type: data.documentType,
+                kyc_document_number: data.documentNumber,
+                kyc_gender: data.gender,
+                kyc_status: 'Pending',
+                kyc_submitted_at: new Date().toISOString(),
+            })
+            .eq('id', userId);
+        
+        if (error) throw error;
         return { success: true };
     } catch (e: any) {
         return { success: false, error: e.message };
@@ -515,17 +535,23 @@ export async function submitKycData(data: Omit<KycData, 'status' | 'submittedAt'
 }
 
 export async function submitAddressData(data: Omit<AddressData, 'status' | 'submittedAt'>): Promise<{ success: boolean; error?: string }> {
-    // Get authenticated user from session cookies
     const user = await getAuthenticatedUser();
     const userId = user.uid;
     
     try {
-        const addressData: AddressData = {
-            ...data,
-            status: 'Pending',
-            submittedAt: new Date(),
-        };
-        await adminDb.collection('users').doc(userId).update({ addressData });
+        const supabase = await createAdminClient();
+        const { error } = await supabase
+            .from('users')
+            .update({
+                address_country: data.country,
+                address_city: data.city,
+                address_street: data.streetAddress,
+                address_status: 'Pending',
+                address_submitted_at: new Date().toISOString(),
+            })
+            .eq('id', userId);
+        
+        if (error) throw error;
         return { success: true };
     } catch (e: any) {
         return { success: false, error: e.message };
@@ -533,34 +559,50 @@ export async function submitAddressData(data: Omit<AddressData, 'status' | 'subm
 }
 
 export async function updateUserPhoneNumber(phoneNumber: string): Promise<{ success: boolean; error?: string }> {
-    // Get authenticated user from session cookies
     const user = await getAuthenticatedUser();
     const userId = user.uid;
     
     try {
-        await adminDb.collection('users').doc(userId).update({ 
-            phoneNumber: phoneNumber,
-            phoneNumberVerified: false // Needs verification
-        });
+        const supabase = await createAdminClient();
+        const { error } = await supabase
+            .from('users')
+            .update({ 
+                phone_number: phoneNumber,
+                phone_number_verified: false
+            })
+            .eq('id', userId);
+        
+        if (error) throw error;
         return { success: true };
     } catch (e: any) {
         return { success: false, error: e.message };
     }
 }
 
-// Admin function - allows admin to update any user's phone number
 export async function adminUpdateUserPhoneNumber(targetUserId: string, phoneNumber: string): Promise<{ success: boolean; error?: string }> {
-    // Get authenticated user from session cookies and verify admin
     const user = await getAuthenticatedUser();
-    if (!user.customClaims?.admin) {
+    const supabase = await createAdminClient();
+    
+    const { data: userData } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', user.uid)
+        .single();
+    
+    if (userData?.role !== 'admin') {
         return { success: false, error: 'Unauthorized: Admin access required' };
     }
     
     try {
-        await adminDb.collection('users').doc(targetUserId).update({ 
-            phoneNumber: phoneNumber,
-            phoneNumberVerified: true // Admin verified
-        });
+        const { error } = await supabase
+            .from('users')
+            .update({ 
+                phone_number: phoneNumber,
+                phone_number_verified: true
+            })
+            .eq('id', targetUserId);
+        
+        if (error) throw error;
         return { success: true };
     } catch (e: any) {
         return { success: false, error: e.message };
@@ -568,33 +610,36 @@ export async function adminUpdateUserPhoneNumber(targetUserId: string, phoneNumb
 }
 
 export async function getUserBalance() {
-    // Get authenticated user from session cookies
     const user = await getAuthenticatedUser();
     const userId = user.uid;
     
-    // Use Admin SDK to bypass Firestore rules (server-side only)
-    const [transactionsSnap, withdrawalsSnap, ordersSnap] = await Promise.all([
-        adminDb.collection('cashbackTransactions').where('userId', '==', userId).get(),
-        adminDb.collection('withdrawals').where('userId', '==', userId).get(),
-        adminDb.collection('orders').where('userId', '==', userId).get()
+    const supabase = await createAdminClient();
+    
+    const [
+        { data: transactions },
+        { data: withdrawals },
+        { data: orders }
+    ] = await Promise.all([
+        supabase.from('cashback_transactions').select('cashback_amount').eq('user_id', userId),
+        supabase.from('withdrawals').select('amount, status').eq('user_id', userId),
+        supabase.from('orders').select('product_price, status').eq('user_id', userId)
     ]);
 
-    const totalEarned = transactionsSnap.docs.reduce((sum, doc) => sum + doc.data().cashbackAmount, 0);
+    const totalEarned = (transactions || []).reduce((sum, t) => sum + t.cashback_amount, 0);
     
     let pendingWithdrawals = 0;
     let completedWithdrawals = 0;
-    withdrawalsSnap.docs.forEach(doc => {
-        const withdrawal = doc.data() as Withdrawal;
-        if (withdrawal.status === 'Processing') {
-            pendingWithdrawals += withdrawal.amount;
-        } else if (withdrawal.status === 'Completed') {
-            completedWithdrawals += withdrawal.amount;
+    (withdrawals || []).forEach(w => {
+        if (w.status === 'Processing') {
+            pendingWithdrawals += w.amount;
+        } else if (w.status === 'Completed') {
+            completedWithdrawals += w.amount;
         }
     });
 
-    const totalSpentOnOrders = ordersSnap.docs
-        .filter(doc => doc.data().status !== 'Cancelled')
-        .reduce((sum, doc) => sum + doc.data().price, 0);
+    const totalSpentOnOrders = (orders || [])
+        .filter(o => o.status !== 'Cancelled')
+        .reduce((sum, o) => sum + o.product_price, 0);
     
     const availableBalance = totalEarned - completedWithdrawals - pendingWithdrawals - totalSpentOnOrders;
 
@@ -606,53 +651,60 @@ export async function getUserBalance() {
         totalSpentOnOrders: Number(totalSpentOnOrders.toFixed(2)),
     };
 }
+
 export async function requestWithdrawal(
     payload: Omit<Withdrawal, 'id' | 'requestedAt' | 'userId'>
 ) {
-    // Get authenticated user from session cookies
     const user = await getAuthenticatedUser();
     const userId = user.uid;
     
     try {
-        // Use Admin SDK for transaction
-        await adminDb.runTransaction(async (transaction) => {
-            // Validate user balance server-side
-            const [transactionsSnap, withdrawalsSnap, ordersSnap] = await Promise.all([
-                adminDb.collection('cashbackTransactions').where('userId', '==', userId).get(),
-                adminDb.collection('withdrawals').where('userId', '==', userId).get(),
-                adminDb.collection('orders').where('userId', '==', userId).get()
-            ]);
+        const supabase = await createAdminClient();
+        
+        const [
+            { data: transactions },
+            { data: withdrawals },
+            { data: orders }
+        ] = await Promise.all([
+            supabase.from('cashback_transactions').select('cashback_amount').eq('user_id', userId),
+            supabase.from('withdrawals').select('amount, status').eq('user_id', userId),
+            supabase.from('orders').select('product_price, status').eq('user_id', userId)
+        ]);
 
-            const totalEarned = transactionsSnap.docs.reduce((sum, doc) => sum + doc.data().cashbackAmount, 0);
-            
-            let pendingWithdrawals = 0;
-            let completedWithdrawals = 0;
-            withdrawalsSnap.docs.forEach(doc => {
-                const withdrawal = doc.data() as Withdrawal;
-                if (withdrawal.status === 'Processing') {
-                    pendingWithdrawals += withdrawal.amount;
-                } else if (withdrawal.status === 'Completed') {
-                    completedWithdrawals += withdrawal.amount;
-                }
-            });
-
-            const totalSpentOnOrders = ordersSnap.docs
-                .filter(doc => doc.data().status !== 'Cancelled')
-                .reduce((sum, doc) => sum + doc.data().price, 0);
-            
-            const availableBalance = totalEarned - completedWithdrawals - pendingWithdrawals - totalSpentOnOrders;
-            
-            if (payload.amount > availableBalance) {
-                throw new Error("Insufficient available balance for this withdrawal.");
+        const totalEarned = (transactions || []).reduce((sum, t) => sum + t.cashback_amount, 0);
+        
+        let pendingWithdrawals = 0;
+        let completedWithdrawals = 0;
+        (withdrawals || []).forEach(w => {
+            if (w.status === 'Processing') {
+                pendingWithdrawals += w.amount;
+            } else if (w.status === 'Completed') {
+                completedWithdrawals += w.amount;
             }
-            
-            const newWithdrawalRef = adminDb.collection('withdrawals').doc();
-            transaction.set(newWithdrawalRef, {
-                ...payload,
-                userId,
-                requestedAt: new Date()
-            });
         });
+
+        const totalSpentOnOrders = (orders || [])
+            .filter(o => o.status !== 'Cancelled')
+            .reduce((sum, o) => sum + o.product_price, 0);
+        
+        const availableBalance = totalEarned - completedWithdrawals - pendingWithdrawals - totalSpentOnOrders;
+        
+        if (payload.amount > availableBalance) {
+            throw new Error("Insufficient available balance for this withdrawal.");
+        }
+        
+        const { error } = await supabase
+            .from('withdrawals')
+            .insert({
+                user_id: userId,
+                amount: payload.amount,
+                status: payload.status,
+                payment_method: payload.paymentMethod,
+                withdrawal_details: payload.withdrawalDetails,
+                requested_at: new Date().toISOString()
+            });
+        
+        if (error) throw error;
         
         return { success: true, message: 'Withdrawal request submitted successfully.' };
     } catch (error) {
@@ -661,295 +713,386 @@ export async function requestWithdrawal(
         return { success: false, message: errorMessage };
     }
 }
-// Admin function - gets ALL trading accounts
+
 export async function getTradingAccounts(): Promise<TradingAccount[]> {
-  const accountsSnapshot = await getDocs(collection(db, 'tradingAccounts'));
-  const accounts: TradingAccount[] = [];
-  accountsSnapshot.docs.forEach(doc => {
-      try {
-          const data = doc.data();
-          accounts.push({
-            id: doc.id,
-            ...data,
-            createdAt: safeToDate(data.createdAt) || new Date(),
-          } as TradingAccount);
-      } catch (error) {
-          console.error(`Error processing trading account ${doc.id}:`, error);
-      }
-  });
-  return accounts;
-}
-
-// User function - gets trading accounts for specific user
-export async function getUserTradingAccounts(): Promise<TradingAccount[]> {
-  // Get authenticated user from session cookies
-  const user = await getAuthenticatedUser();
-  const userId = user.uid;
-  
-  // Use Admin SDK to bypass Firestore rules (server-side only)
-  const accountsSnapshot = await adminDb.collection('tradingAccounts')
-    .where('userId', '==', userId)
-    .get();
-  
-  const accounts: TradingAccount[] = accountsSnapshot.docs.map(doc => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      ...data,
-      createdAt: data.createdAt?.toDate() || new Date(),
-    } as TradingAccount;
-  });
-  
-  return accounts;
-}
-
-// User function - gets withdrawals for specific user
-export async function getUserWithdrawals(): Promise<Withdrawal[]> {
-  // Get authenticated user from session cookies
-  const user = await getAuthenticatedUser();
-  const userId = user.uid;
-  
-  // Use Admin SDK to bypass Firestore rules (server-side only)
-  const withdrawalsSnapshot = await adminDb.collection('withdrawals')
-    .where('userId', '==', userId)
-    .get();
-  
-  const withdrawals: Withdrawal[] = withdrawalsSnapshot.docs.map(doc => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      ...data,
-      requestedAt: data.requestedAt?.toDate() || new Date(),
-      completedAt: data.completedAt?.toDate(),
-    } as Withdrawal;
-  });
-  
-  return withdrawals;
-}
-
-// Admin function - gets dashboard statistics
-export async function getAdminDashboardStats() {
-  // Get authenticated user from session cookies and verify admin
-  const user = await getAuthenticatedUser();
-  if (!user.customClaims?.admin) {
-    throw new Error('Unauthorized: Admin access required');
-  }
-  
-  // Fetch all cashback transactions for commissions calculation
-  const commissionsSnapshot = await adminDb.collection('cashbackTransactions')
-    .where('sourceType', 'in', ['cashback', 'store_purchase'])
-    .get();
-  
-  const totalReferralCommissions = commissionsSnapshot.docs.reduce((sum, doc) => {
-    return sum + (doc.data().cashbackAmount || 0);
-  }, 0);
-  
-  // Fetch non-cancelled orders for store spending
-  const ordersSnapshot = await adminDb.collection('orders')
-    .get();
-  
-  const totalStoreSpending = ordersSnapshot.docs
-    .filter(doc => doc.data().status !== 'Cancelled')
-    .reduce((sum, doc) => sum + (doc.data().price || 0), 0);
-  
-  // Fetch all cashback transactions for total cashback added
-  const allCashbackSnapshot = await adminDb.collection('cashbackTransactions')
-    .get();
-  
-  const totalCashbackAdded = allCashbackSnapshot.docs.reduce((sum, doc) => {
-    return sum + (doc.data().cashbackAmount || 0);
-  }, 0);
-  
-  return {
-    totalReferralCommissions,
-    totalStoreSpending,
-    totalCashbackAdded,
-  };
-}
-
-// User function - gets referral data for specific user
-export async function getUserReferralData() {
-  // Get authenticated user from session cookies
-  const user = await getAuthenticatedUser();
-  const userId = user.uid;
-  
-  // Get user profile
-  const userDoc = await adminDb.collection('users').doc(userId).get();
-  if (!userDoc.exists) {
-    throw new Error('User not found');
-  }
-  
-  const userData = userDoc.data();
-  
-  // Get referral users
-  const referralUids = userData?.referrals || [];
-  const referralPromises = referralUids.map((uid: string) => 
-    adminDb.collection('users').doc(uid).get()
-  );
-  const referralDocs = await Promise.all(referralPromises);
-  
-  const referrals = referralDocs
-    .filter(doc => doc.exists)
-    .map(doc => ({
-      uid: doc.id,
-      name: doc.data()?.name,
-      createdAt: doc.data()?.createdAt?.toDate() || new Date(),
-      status: doc.data()?.status,
+    const supabase = await createClient();
+    const { data, error } = await supabase
+        .from('trading_accounts')
+        .select('*');
+    
+    if (error) {
+        console.error("Error fetching trading accounts:", error);
+        return [];
+    }
+    
+    return (data || []).map(item => ({
+        id: item.id,
+        userId: item.user_id,
+        broker: item.broker,
+        accountNumber: item.account_number,
+        status: item.status,
+        createdAt: new Date(item.created_at),
+        rejectionReason: item.rejection_reason,
     }));
-  
-  // Get commission history  
-  const commissionSnapshot = await adminDb.collection('cashbackTransactions')
-    .where('userId', '==', userId)
-    .where('sourceType', 'in', ['cashback', 'store_purchase'])
-    .get();
-  
-  const commissionHistory = commissionSnapshot.docs.map(doc => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      ...data,
-      date: data.date?.toDate() || new Date(),
-    };
-  });
-  
-  commissionHistory.sort((a: any, b: any) => b.date.getTime() - a.date.getTime());
-  
-  return {
-    userProfile: {
-      uid: userDoc.id,
-      referralCode: userData?.referralCode,
-      referrals: userData?.referrals || [],
-    },
-    referrals,
-    commissionHistory,
-  };
 }
 
-// Public function - gets enabled offers
+export async function getUserTradingAccounts(): Promise<TradingAccount[]> {
+    const user = await getAuthenticatedUser();
+    const userId = user.uid;
+    
+    const supabase = await createAdminClient();
+    const { data, error } = await supabase
+        .from('trading_accounts')
+        .select('*')
+        .eq('user_id', userId);
+    
+    if (error) {
+        console.error("Error fetching user trading accounts:", error);
+        return [];
+    }
+    
+    return (data || []).map(item => ({
+        id: item.id,
+        userId: item.user_id,
+        broker: item.broker,
+        accountNumber: item.account_number,
+        status: item.status,
+        createdAt: new Date(item.created_at),
+        rejectionReason: item.rejection_reason,
+    }));
+}
+
+export async function getUserWithdrawals(): Promise<Withdrawal[]> {
+    const user = await getAuthenticatedUser();
+    const userId = user.uid;
+    
+    const supabase = await createAdminClient();
+    const { data, error } = await supabase
+        .from('withdrawals')
+        .select('*')
+        .eq('user_id', userId);
+    
+    if (error) {
+        console.error("Error fetching user withdrawals:", error);
+        return [];
+    }
+    
+    return (data || []).map(item => ({
+        id: item.id,
+        userId: item.user_id,
+        amount: item.amount,
+        status: item.status,
+        paymentMethod: item.payment_method,
+        withdrawalDetails: item.withdrawal_details,
+        requestedAt: new Date(item.requested_at),
+        completedAt: item.completed_at ? new Date(item.completed_at) : undefined,
+        txId: item.tx_id,
+        rejectionReason: item.rejection_reason,
+        previousWithdrawalDetails: item.previous_withdrawal_details,
+    }));
+}
+
+export async function getAdminDashboardStats() {
+    const user = await getAuthenticatedUser();
+    const supabase = await createAdminClient();
+    
+    const { data: userData } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', user.uid)
+        .single();
+    
+    if (userData?.role !== 'admin') {
+        throw new Error('Unauthorized: Admin access required');
+    }
+    
+    const { data: commissions } = await supabase
+        .from('cashback_transactions')
+        .select('cashback_amount')
+        .in('source_type', ['cashback', 'store_purchase']);
+    
+    const totalReferralCommissions = (commissions || []).reduce((sum, c) => sum + (c.cashback_amount || 0), 0);
+    
+    const { data: orders } = await supabase
+        .from('orders')
+        .select('product_price, status');
+    
+    const totalStoreSpending = (orders || [])
+        .filter(o => o.status !== 'Cancelled')
+        .reduce((sum, o) => sum + (o.product_price || 0), 0);
+    
+    const { data: allCashback } = await supabase
+        .from('cashback_transactions')
+        .select('cashback_amount');
+    
+    const totalCashbackAdded = (allCashback || []).reduce((sum, c) => sum + (c.cashback_amount || 0), 0);
+    
+    return {
+        totalReferralCommissions,
+        totalStoreSpending,
+        totalCashbackAdded,
+    };
+}
+
+export async function getUserReferralData() {
+    const user = await getAuthenticatedUser();
+    const userId = user.uid;
+    
+    const supabase = await createAdminClient();
+    
+    const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id, referral_code')
+        .eq('id', userId)
+        .single();
+    
+    if (userError || !userData) {
+        throw new Error('User not found');
+    }
+    
+    const { data: referrals } = await supabase
+        .from('users')
+        .select('id, name, created_at, status')
+        .eq('referred_by', userId);
+    
+    const referralsList = (referrals || []).map(r => ({
+        uid: r.id,
+        name: r.name,
+        createdAt: new Date(r.created_at),
+        status: r.status,
+    }));
+    
+    const { data: commissions } = await supabase
+        .from('cashback_transactions')
+        .select('*')
+        .eq('user_id', userId)
+        .in('source_type', ['cashback', 'store_purchase'])
+        .order('date', { ascending: false });
+    
+    const commissionHistory = (commissions || []).map(c => ({
+        id: c.id,
+        userId: c.user_id,
+        accountId: c.account_id,
+        accountNumber: c.account_number,
+        broker: c.broker,
+        date: new Date(c.date),
+        tradeDetails: c.trade_details,
+        cashbackAmount: c.cashback_amount,
+        referralBonusTo: c.referral_bonus_to,
+        referralBonusAmount: c.referral_bonus_amount,
+        sourceUserId: c.source_user_id,
+        sourceType: c.source_type,
+        transactionId: c.transaction_id,
+        note: c.note,
+    }));
+    
+    return {
+        userProfile: {
+            uid: userData.id,
+            referralCode: userData.referral_code,
+            referrals: referralsList.map(r => r.uid),
+        },
+        referrals: referralsList,
+        commissionHistory,
+    };
+}
+
 export async function getEnabledOffers() {
-  const offersSnapshot = await adminDb.collection('offers')
-    .where('isEnabled', '==', true)
-    .get();
-  
-  return offersSnapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data(),
-  }));
+    const supabase = await createAdminClient();
+    const { data, error } = await supabase
+        .from('offers')
+        .select('*')
+        .eq('is_enabled', true);
+    
+    if (error) {
+        console.error("Error fetching offers:", error);
+        return [];
+    }
+    
+    return data || [];
 }
 
-// User function - submits trading account for review
 export async function submitTradingAccount(
-  brokerId: string,
-  brokerName: string,
-  accountNumber: string
+    brokerId: string,
+    brokerName: string,
+    accountNumber: string
 ): Promise<{ success: boolean; message: string }> {
-  // Get authenticated user from session cookies
-  const user = await getAuthenticatedUser();
-  const userId = user.uid;
-  
-  // Normalize account number
-  const normalizedAccountNumber = accountNumber.trim();
-  
-  try {
-    // Use transaction for atomic duplicate check and creation
-    return await adminDb.runTransaction(async (transaction) => {
-      // Check for duplicate account
-      const duplicateQuery = await adminDb.collection('tradingAccounts')
-        .where('brokerId', '==', brokerId)
-        .where('accountNumber', '==', normalizedAccountNumber)
-        .get();
-      
-      if (!duplicateQuery.empty) {
+    const user = await getAuthenticatedUser();
+    const userId = user.uid;
+    
+    const normalizedAccountNumber = accountNumber.trim();
+    
+    try {
+        const supabase = await createAdminClient();
+        
+        const { data: existing, error: checkError } = await supabase
+            .from('trading_accounts')
+            .select('id')
+            .eq('broker', brokerName)
+            .eq('account_number', normalizedAccountNumber)
+            .single();
+        
+        if (existing) {
+            return {
+                success: false,
+                message: 'رقم حساب التداول هذا مرتبط بالفعل لهذا الوسيط.'
+            };
+        }
+        
+        const { error: insertError } = await supabase
+            .from('trading_accounts')
+            .insert({
+                user_id: userId,
+                broker: brokerName,
+                account_number: normalizedAccountNumber,
+                status: 'Pending',
+                created_at: new Date().toISOString(),
+            });
+        
+        if (insertError) {
+            throw insertError;
+        }
+        
         return {
-          success: false,
-          message: 'رقم حساب التداول هذا مرتبط بالفعل لهذا الوسيط.'
+            success: true,
+            message: 'تم تقديم حساب التداول الخاص بك للموافقة.'
         };
-      }
-      
-      // Add the trading account
-      const accountRef = adminDb.collection('tradingAccounts').doc();
-      transaction.set(accountRef, {
-        userId,
-        brokerId,
-        broker: brokerName, // For backward compatibility with existing pages
-        accountNumber: normalizedAccountNumber,
-        status: 'Pending',
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-      
-      return {
-        success: true,
-        message: 'تم تقديم حساب التداول الخاص بك للموافقة.'
-      };
-    });
-  } catch (error) {
-    console.error('Error submitting trading account:', error);
-    return {
-      success: false,
-      message: 'حدثت مشكلة أثناء تقديم حسابك. يرجى المحاولة مرة أخرى.'
-    };
-  }
+    } catch (error) {
+        console.error('Error submitting trading account:', error);
+        return {
+            success: false,
+            message: 'حدثت مشكلة أثناء تقديم حسابك. يرجى المحاولة مرة أخرى.'
+        };
+    }
 }
 
 export async function getPublishedBlogPosts(): Promise<BlogPost[]> {
-    const q = query(
-        collection(db, 'blogPosts'), 
-        where('status', '==', 'published')
-    );
-    const snapshot = await getDocs(q);
-    const posts = snapshot.docs.map(doc => convertTimestamps({ id: doc.id, ...doc.data() }));
+    const supabase = await createClient();
+    const { data, error } = await supabase
+        .from('blog_posts')
+        .select('*')
+        .eq('status', 'published')
+        .order('created_at', { ascending: false });
 
-    // Sort in-memory to avoid composite index
-    posts.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    if (error) {
+        console.error("Error fetching blog posts:", error);
+        return [];
+    }
 
-    return posts;
+    return (data || []).map(item => ({
+        id: item.id,
+        title: item.title,
+        slug: item.slug,
+        content: item.content,
+        excerpt: item.excerpt,
+        imageUrl: item.image_url,
+        authorName: item.author_name,
+        authorId: item.author_id,
+        status: item.status,
+        tags: item.tags || [],
+        createdAt: new Date(item.created_at),
+        updatedAt: new Date(item.updated_at),
+    }));
 }
+
 export async function getBlogPostBySlug(slug: string): Promise<BlogPost | null> {
-    const q = query(
-        collection(db, 'blogPosts'), 
-        where('slug', '==', slug), 
-        where('status', '==', 'published')
-    );
-    const snapshot = await getDocs(q);
-    if (snapshot.empty) {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+        .from('blog_posts')
+        .select('*')
+        .eq('slug', slug)
+        .eq('status', 'published')
+        .single();
+
+    if (error || !data) {
         return null;
     }
-    return convertTimestamps({id: snapshot.docs[0].id, ...snapshot.docs[0].data()});
+
+    return {
+        id: data.id,
+        title: data.title,
+        slug: data.slug,
+        content: data.content,
+        excerpt: data.excerpt,
+        imageUrl: data.image_url,
+        authorName: data.author_name,
+        authorId: data.author_id,
+        status: data.status,
+        tags: data.tags || [],
+        createdAt: new Date(data.created_at),
+        updatedAt: new Date(data.updated_at),
+    };
 }
+
 export async function addBlogPost(data: Omit<BlogPost, 'id' | 'createdAt' | 'updatedAt'>) {
     try {
-        await addDoc(collection(db, 'blogPosts'), {
-            ...data,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-        });
+        const supabase = await createClient();
+        const { error } = await supabase
+            .from('blog_posts')
+            .insert({
+                title: data.title,
+                slug: data.slug,
+                content: data.content,
+                excerpt: data.excerpt,
+                image_url: data.imageUrl,
+                author_name: data.authorName,
+                author_id: data.authorId,
+                status: data.status,
+                tags: data.tags,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+            });
+        
+        if (error) throw error;
         return { success: true, message: 'تم إنشاء المقال بنجاح.' };
     } catch (error) {
         console.error("Error adding blog post:", error);
         return { success: false, message: 'فشل إنشاء المقال.' };
     }
 }
+
 export async function updateBlogPost(id: string, data: Partial<Omit<BlogPost, 'id' | 'createdAt'>>) {
     try {
-        const postRef = doc(db, 'blogPosts', id);
-        await updateDoc(postRef, {
-            ...data,
-            updatedAt: serverTimestamp(),
-        });
+        const supabase = await createClient();
+        const updateData: any = {
+            updated_at: new Date().toISOString(),
+        };
+        
+        if (data.title !== undefined) updateData.title = data.title;
+        if (data.slug !== undefined) updateData.slug = data.slug;
+        if (data.content !== undefined) updateData.content = data.content;
+        if (data.excerpt !== undefined) updateData.excerpt = data.excerpt;
+        if (data.imageUrl !== undefined) updateData.image_url = data.imageUrl;
+        if (data.authorName !== undefined) updateData.author_name = data.authorName;
+        if (data.authorId !== undefined) updateData.author_id = data.authorId;
+        if (data.status !== undefined) updateData.status = data.status;
+        if (data.tags !== undefined) updateData.tags = data.tags;
+        
+        const { error } = await supabase
+            .from('blog_posts')
+            .update(updateData)
+            .eq('id', id);
+        
+        if (error) throw error;
         return { success: true, message: 'تم تحديث المقال بنجاح.' };
     } catch (error) {
         console.error("Error updating blog post:", error);
         return { success: false, message: 'فشل تحديث المقال.' };
     }
 }
+
 export async function deleteBlogPost(id: string) {
     try {
-        await deleteDoc(doc(db, 'blogPosts', id));
+        const supabase = await createClient();
+        const { error } = await supabase
+            .from('blog_posts')
+            .delete()
+            .eq('id', id);
+        
+        if (error) throw error;
         return { success: true, message: 'تم حذف المقال بنجاح.' };
     } catch (error) {
         console.error("Error deleting blog post:", error);
         return { success: false, message: 'فشل حذف المقال.' };
     }
 }
-
-      
