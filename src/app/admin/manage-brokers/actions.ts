@@ -3,6 +3,34 @@
 import { createAdminClient } from '@/lib/supabase/server';
 import type { Broker } from '@/types';
 
+// Transform camelCase Broker fields to snake_case for database
+function transformBrokerForDB(broker: Partial<Omit<Broker, 'id' | 'order'>>): any {
+  const dbData: any = {};
+  
+  // Map camelCase to snake_case for nested object fields
+  if (broker.logoUrl !== undefined) dbData.logo_url = broker.logoUrl;
+  if (broker.basicInfo !== undefined) dbData.basic_info = broker.basicInfo;
+  if (broker.regulation !== undefined) dbData.regulation = broker.regulation;
+  if (broker.tradingConditions !== undefined) dbData.trading_conditions = broker.tradingConditions;
+  if (broker.platforms !== undefined) dbData.platforms = broker.platforms;
+  if (broker.instruments !== undefined) dbData.instruments = broker.instruments;
+  if (broker.depositsWithdrawals !== undefined) dbData.deposits_withdrawals = broker.depositsWithdrawals;
+  if (broker.cashback !== undefined) dbData.cashback = broker.cashback;
+  if (broker.globalReach !== undefined) dbData.global_reach = broker.globalReach;
+  if (broker.reputation !== undefined) dbData.reputation = broker.reputation;
+  if (broker.additionalFeatures !== undefined) dbData.additional_features = broker.additionalFeatures;
+  
+  // Legacy fields
+  if (broker.name !== undefined) dbData.name = broker.name;
+  if (broker.description !== undefined) dbData.description = broker.description;
+  if (broker.category !== undefined) dbData.category = broker.category;
+  if (broker.rating !== undefined) dbData.rating = broker.rating;
+  if (broker.instructions !== undefined) dbData.instructions = broker.instructions;
+  if (broker.existingAccountInstructions !== undefined) dbData.existing_account_instructions = broker.existingAccountInstructions;
+  
+  return dbData;
+}
+
 export async function getBrokers(): Promise<Broker[]> {
   const supabase = await createAdminClient();
   const { data, error } = await supabase
@@ -37,9 +65,10 @@ export async function addBroker(data: Omit<Broker, 'id' | 'order'>) {
       ? brokersData[0].order
       : -1;
 
+    const dbData = transformBrokerForDB(data);
     const { error } = await supabase
       .from('brokers')
-      .insert({ ...data, order: maxOrder + 1 });
+      .insert({ ...dbData, order: maxOrder + 1 });
 
     if (error) {
       console.error('Error adding broker:', error);
@@ -56,9 +85,10 @@ export async function addBroker(data: Omit<Broker, 'id' | 'order'>) {
 export async function updateBroker(brokerId: string, data: Partial<Omit<Broker, 'id'>>) {
   try {
     const supabase = await createAdminClient();
+    const dbData = transformBrokerForDB(data);
     const { error } = await supabase
       .from('brokers')
-      .update(data)
+      .update(dbData)
       .eq('id', brokerId);
 
     if (error) {
@@ -137,7 +167,8 @@ export async function addBrokersBatch(brokers: Omit<Broker, 'id' | 'order'>[]) {
 
     const brokersToInsert = brokers.map((brokerData) => {
       maxOrder++;
-      return { ...brokerData, order: maxOrder };
+      const dbData = transformBrokerForDB(brokerData);
+      return { ...dbData, order: maxOrder };
     });
 
     const { error } = await supabase
