@@ -2,7 +2,7 @@ import 'server-only';
 import { createClient } from '@/lib/supabase/server';
 
 export interface AuthenticatedUser {
-  uid: string;
+  id: string;
   email: string | null;
   emailVerified: boolean;
   role?: 'user' | 'admin';
@@ -29,7 +29,7 @@ export async function getAuthenticatedUser(): Promise<AuthenticatedUser> {
       .single();
 
     return {
-      uid: user.id,
+      id: user.id,
       email: user.email || null,
       emailVerified: user.email_confirmed_at != null,
       role: userProfile?.role || 'user',
