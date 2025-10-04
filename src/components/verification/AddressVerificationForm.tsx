@@ -27,9 +27,10 @@ type AddressFormValues = z.infer<typeof addressSchema>;
 interface AddressVerificationFormProps {
   onSuccess: () => void;
   onCancel: () => void;
+  userCountry?: string | null;
 }
 
-export function AddressVerificationForm({ onSuccess, onCancel }: AddressVerificationFormProps) {
+export function AddressVerificationForm({ onSuccess, onCancel, userCountry }: AddressVerificationFormProps) {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [documentPreview, setDocumentPreview] = useState<string | null>(null);
@@ -38,7 +39,7 @@ export function AddressVerificationForm({ onSuccess, onCancel }: AddressVerifica
   const form = useForm<AddressFormValues>({
     resolver: zodResolver(addressSchema),
     defaultValues: {
-      country: '',
+      country: userCountry || '',
       city: '',
       stateProvince: '',
       streetAddress: '',

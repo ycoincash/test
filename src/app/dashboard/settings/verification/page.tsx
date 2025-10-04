@@ -17,7 +17,7 @@ import { KycVerificationForm } from "@/components/verification/KycVerificationFo
 import { AddressVerificationForm } from "@/components/verification/AddressVerificationForm";
 
 // KYC Dialog Component
-function KycFormDialog({ onKycSubmit }: { onKycSubmit: () => void }) {
+function KycFormDialog({ onKycSubmit, userCountry }: { onKycSubmit: () => void; userCountry?: string | null }) {
     const [isOpen, setIsOpen] = useState(false);
 
     return (
@@ -37,6 +37,7 @@ function KycFormDialog({ onKycSubmit }: { onKycSubmit: () => void }) {
                         setIsOpen(false);
                     }} 
                     onCancel={() => setIsOpen(false)}
+                    userCountry={userCountry}
                 />
             </DialogContent>
         </Dialog>
@@ -44,7 +45,7 @@ function KycFormDialog({ onKycSubmit }: { onKycSubmit: () => void }) {
 }
 
 // Address Dialog Component
-function AddressFormDialog({ onAddressSubmit }: { onAddressSubmit: () => void }) {
+function AddressFormDialog({ onAddressSubmit, userCountry }: { onAddressSubmit: () => void; userCountry?: string | null }) {
     const [isOpen, setIsOpen] = useState(false);
 
     return (
@@ -64,6 +65,7 @@ function AddressFormDialog({ onAddressSubmit }: { onAddressSubmit: () => void })
                         setIsOpen(false);
                     }} 
                     onCancel={() => setIsOpen(false)}
+                    userCountry={userCountry}
                 />
             </DialogContent>
         </Dialog>
@@ -162,14 +164,14 @@ export default function VerificationPage() {
             {kycStatus === 'Verified' || kycStatus === 'Pending' ? (
                  <VerificationItemContent icon={User} title="التحقق من الهوية (KYC)" status={kycStatus} />
             ) : (
-                <KycFormDialog onKycSubmit={refetchUserData} />
+                <KycFormDialog onKycSubmit={refetchUserData} userCountry={profile.country} />
             )}
 
             {/* Address Verification */}
             {addressStatus === 'Verified' || addressStatus === 'Pending' ? (
                  <VerificationItemContent icon={Home} title="التحقق من العنوان" status={addressStatus} />
             ) : (
-                <AddressFormDialog onAddressSubmit={refetchUserData} />
+                <AddressFormDialog onAddressSubmit={refetchUserData} userCountry={profile.country} />
             )}
         </div>
     );

@@ -26,6 +26,7 @@ type KycFormValues = z.infer<typeof kycSchema>;
 interface KycVerificationFormProps {
   onSuccess: () => void;
   onCancel: () => void;
+  userCountry?: string | null;
 }
 
 const countries = [
@@ -41,7 +42,7 @@ const countries = [
   { value: 'OM', label: 'عمان', flag: '🇴🇲' },
 ];
 
-export function KycVerificationForm({ onSuccess, onCancel }: KycVerificationFormProps) {
+export function KycVerificationForm({ onSuccess, onCancel, userCountry }: KycVerificationFormProps) {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [frontPreview, setFrontPreview] = useState<string | null>(null);
@@ -53,7 +54,7 @@ export function KycVerificationForm({ onSuccess, onCancel }: KycVerificationForm
     mode: 'onChange',
     defaultValues: {
       documentType: undefined,
-      nationality: '',
+      nationality: userCountry || '',
     },
   });
 
