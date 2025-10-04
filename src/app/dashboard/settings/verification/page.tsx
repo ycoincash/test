@@ -9,53 +9,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
-import { sendVerificationEmail, submitKycData, submitAddressData } from "@/app/actions";
+import { sendVerificationEmail } from "@/app/actions";
 import type { KycData, AddressData } from "@/types";
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { KycVerificationForm } from "@/components/verification/KycVerificationForm";
+import { AddressVerificationForm } from "@/components/verification/AddressVerificationForm";
 
-// KYC Form Schema and Component
-const kycSchema = z.object({
-  documentType: z.enum(['id_card', 'passport'], { required_error: "نوع الوثيقة مطلوب"}),
-  documentNumber: z.string().min(5, "رقم الوثيقة مطلوب"),
-  gender: z.enum(['male', 'female'], { required_error: "الجنس مطلوب"}),
-});
-type KycFormValues = z.infer<typeof kycSchema>;
-
+// KYC Dialog Component
 function KycFormDialog({ onKycSubmit }: { onKycSubmit: () => void }) {
     const [isOpen, setIsOpen] = useState(false);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const { user } = useAuthContext();
-    const { toast } = useToast();
-
-    const form = useForm<KycFormValues>({
-        resolver: zodResolver(kycSchema),
-        defaultValues: {
-            documentType: undefined,
-            documentNumber: "",
-            gender: undefined,
-        },
-    });
-
-    const onSubmit = async (data: KycFormValues) => {
-        if (!user) return;
-        setIsSubmitting(true);
-        const result = await submitKycData(data);
-        if (result.success) {
-            toast({ title: "تم الإرسال", description: "تم إرسال معلومات التحقق الخاصة بك للمراجعة." });
-            onKycSubmit();
-            setIsOpen(false);
-        } else {
-            toast({ variant: 'destructive', title: "خطأ", description: result.error });
-        }
-        setIsSubmitting(false);
-    };
 
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -64,115 +27,44 @@ function KycFormDialog({ onKycSubmit }: { onKycSubmit: () => void }) {
                     <VerificationItemContent icon={User} title="التحقق من الهوية (KYC)" status="Not Verified" />
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-                 <DialogHeader>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
                     <DialogTitle>التحقق من الهوية (KYC)</DialogTitle>
-                    <DialogDescription>أدخل تفاصيل وثيقة الهوية الخاصة بك.</DialogDescription>
                 </DialogHeader>
-                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                        <FormField control={form.control} name="documentType" render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>نوع الوثيقة</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                    <FormControl><SelectTrigger><SelectValue placeholder="اختر نوع الوثيقة" /></SelectTrigger></FormControl>
-                                    <SelectContent>
-                                        <SelectItem value="id_card">بطاقة الهوية</SelectItem>
-                                        <SelectItem value="passport">جواز السفر</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <FormMessage />
-                            </FormItem>
-                        )}/>
-                        <FormField control={form.control} name="documentNumber" render={({ field }) => (<FormItem><FormLabel>رقم الوثيقة</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)}/>
-                        <FormField control={form.control} name="gender" render={({ field }) => (
-                             <FormItem>
-                                <FormLabel>الجنس</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                    <FormControl><SelectTrigger><SelectValue placeholder="اختر الجنس" /></SelectTrigger></FormControl>
-                                    <SelectContent>
-                                        <SelectItem value="male">ذكر</SelectItem>
-                                        <SelectItem value="female">أنثى</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <FormMessage />
-                            </FormItem>
-                        )}/>
-                        <DialogFooter>
-                            <Button type="submit" disabled={isSubmitting}>
-                                {isSubmitting && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
-                                إرسال للمراجعة
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </Form>
+                <KycVerificationForm 
+                    onSuccess={() => {
+                        onKycSubmit();
+                        setIsOpen(false);
+                    }} 
+                    onCancel={() => setIsOpen(false)}
+                />
             </DialogContent>
         </Dialog>
     );
 }
 
-// Address Form Schema and Component
-const addressSchema = z.object({
-  country: z.string().min(2, "الدولة مطلوبة"),
-  city: z.string().min(2, "المدينة مطلوبة"),
-  streetAddress: z.string().min(5, "عنوان الشارع مطلوب"),
-});
-type AddressFormValues = z.infer<typeof addressSchema>;
-
+// Address Dialog Component
 function AddressFormDialog({ onAddressSubmit }: { onAddressSubmit: () => void }) {
     const [isOpen, setIsOpen] = useState(false);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const { user } = useAuthContext();
-    const { toast } = useToast();
-
-    const form = useForm<AddressFormValues>({
-        resolver: zodResolver(addressSchema),
-        defaultValues: {
-            country: "",
-            city: "",
-            streetAddress: "",
-        },
-    });
-    
-    const onSubmit = async (data: AddressFormValues) => {
-        if (!user) return;
-        setIsSubmitting(true);
-        const result = await submitAddressData(data);
-        if (result.success) {
-            toast({ title: "تم الإرسال", description: "تم إرسال عنوانك للمراجعة." });
-            onAddressSubmit();
-            setIsOpen(false);
-        } else {
-            toast({ variant: 'destructive', title: "خطأ", description: result.error });
-        }
-        setIsSubmitting(false);
-    };
 
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
-                 <Button variant="ghost" className="h-full w-full p-0 justify-start">
+                <Button variant="ghost" className="h-full w-full p-0 justify-start">
                     <VerificationItemContent icon={Home} title="التحقق من العنوان" status="Not Verified" />
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-                 <DialogHeader>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
                     <DialogTitle>التحقق من العنوان</DialogTitle>
-                    <DialogDescription>أدخل تفاصيل عنوانك.</DialogDescription>
                 </DialogHeader>
-                 <Form {...form}>
-                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                        <FormField control={form.control} name="country" render={({ field }) => (<FormItem><FormLabel>الدولة</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)}/>
-                        <FormField control={form.control} name="city" render={({ field }) => (<FormItem><FormLabel>المدينة</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)}/>
-                        <FormField control={form.control} name="streetAddress" render={({ field }) => (<FormItem><FormLabel>عنوان الشارع</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)}/>
-                        <DialogFooter>
-                            <Button type="submit" disabled={isSubmitting}>
-                                {isSubmitting && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
-                                إرسال للمراجعة
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </Form>
+                <AddressVerificationForm 
+                    onSuccess={() => {
+                        onAddressSubmit();
+                        setIsOpen(false);
+                    }} 
+                    onCancel={() => setIsOpen(false)}
+                />
             </DialogContent>
         </Dialog>
     );
