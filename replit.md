@@ -63,6 +63,18 @@ The following environment variables must be configured in Replit Secrets:
 - **Run Command:** `npm start`
 
 ### Recent Changes
+- **2025-10-04:** KYC Verification Form Redesign - Streamlined User Flow
+  - Redesigned KYC verification form to match modern UX patterns with cleaner step-by-step flow
+  - **Step 1**: Document type selection (Driver's license, ID card, Passport) + Country selection with flags
+  - **Step 2**: Personal information collection (name, DOB, gender, document details)
+  - **Step 3**: Document upload with visual feedback and preview thumbnails
+  - Enhanced upload UI with clear front/back side separation
+  - Real-time image preview with delete/re-upload functionality
+  - Visual progress indicator at the top
+  - Improved validation with step-by-step form control
+  - Better mobile responsiveness with larger touch targets
+  - Maintains our design branding while following industry-standard verification flows
+
 - **2025-10-04:** Admin Document Viewer for KYC/Address Verification
   - Created comprehensive DocumentViewer component to display uploaded verification documents
   - Integrated document viewer into admin verification management panel
