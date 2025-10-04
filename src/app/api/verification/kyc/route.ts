@@ -13,29 +13,17 @@ export async function POST(request: Request) {
     const body = await request.json();
     const {
       documentType,
-      documentNumber,
-      fullName,
-      dateOfBirth,
       nationality,
-      documentIssueDate,
-      documentExpiryDate,
-      gender,
       documentFrontUrl,
       documentBackUrl,
     } = body;
 
-    // Update user's KYC data
+    // Update user's KYC data - personal info will be extracted by admin later
     const { error } = await supabase
       .from('users')
       .update({
         kyc_document_type: documentType,
-        kyc_document_number: documentNumber,
-        kyc_full_name: fullName,
-        kyc_date_of_birth: dateOfBirth,
         kyc_nationality: nationality,
-        kyc_document_issue_date: documentIssueDate,
-        kyc_document_expiry_date: documentExpiryDate,
-        kyc_gender: gender,
         kyc_document_front_url: documentFrontUrl,
         kyc_document_back_url: documentBackUrl,
         kyc_status: 'Pending',

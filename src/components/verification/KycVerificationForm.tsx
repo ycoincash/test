@@ -6,11 +6,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Card } from '@/components/ui/card';
-import { Upload, Trash2, Loader2, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Upload, Trash2, Loader2, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { uploadVerificationDocument } from '@/app/actions/upload';
 import { Progress } from '@/components/ui/progress';
@@ -19,12 +17,6 @@ import Image from 'next/image';
 const kycSchema = z.object({
   documentType: z.enum(['id_card', 'passport', 'driver_license'], { required_error: 'نوع الوثيقة مطلوب' }),
   nationality: z.string().min(2, 'بلد الإصدار مطلوب'),
-  documentNumber: z.string().min(5, 'رقم الوثيقة مطلوب (5 أحرف على الأقل)'),
-  fullName: z.string().min(3, 'الاسم الكامل مطلوب'),
-  dateOfBirth: z.string().min(1, 'تاريخ الميلاد مطلوب'),
-  documentIssueDate: z.string().min(1, 'تاريخ الإصدار مطلوب'),
-  documentExpiryDate: z.string().min(1, 'تاريخ الانتهاء مطلوب'),
-  gender: z.enum(['male', 'female'], { required_error: 'الجنس مطلوب' }),
   documentFrontFile: z.instanceof(File, { message: 'صورة الوثيقة (الوجه الأمامي) مطلوبة' }),
   documentBackFile: z.instanceof(File).optional(),
 });
@@ -62,12 +54,6 @@ export function KycVerificationForm({ onSuccess, onCancel }: KycVerificationForm
     defaultValues: {
       documentType: undefined,
       nationality: '',
-      documentNumber: '',
-      fullName: '',
-      dateOfBirth: '',
-      documentIssueDate: '',
-      documentExpiryDate: '',
-      gender: undefined,
     },
   });
 
@@ -129,7 +115,8 @@ export function KycVerificationForm({ onSuccess, onCancel }: KycVerificationForm
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...data,
+          documentType: data.documentType,
+          nationality: data.nationality,
           documentFrontUrl: frontResult.url,
           documentBackUrl: backUrl,
         }),
@@ -153,24 +140,17 @@ export function KycVerificationForm({ onSuccess, onCancel }: KycVerificationForm
   };
 
   const nextStep = async () => {
-    let isValid = false;
-    
-    if (step === 1) {
-      isValid = await form.trigger(['documentType', 'nationality']);
-    } else if (step === 2) {
-      isValid = await form.trigger(['fullName', 'dateOfBirth', 'gender', 'documentNumber', 'documentIssueDate', 'documentExpiryDate']);
-    }
-    
+    const isValid = await form.trigger(['documentType', 'nationality']);
     if (isValid) {
-      setStep(step + 1);
+      setStep(2);
     }
   };
 
   const prevStep = () => {
-    setStep(step - 1);
+    setStep(1);
   };
 
-  const progress = (step / 3) * 100;
+  const progress = (step / 2) * 100;
 
   return (
     <div className="w-full max-w-2xl mx-auto">
@@ -277,130 +257,6 @@ export function KycVerificationForm({ onSuccess, onCancel }: KycVerificationForm
           )}
 
           {step === 2 && (
-            <div className="space-y-6">
-              <div className="text-center mb-6">
-                <h3 className="text-2xl font-bold mb-2">المعلومات الشخصية</h3>
-                <p className="text-muted-foreground">تأكد من أن جميع المعلومات مطابقة للوثيقة</p>
-              </div>
-
-              <FormField
-                control={form.control}
-                name="fullName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>الاسم الكامل *</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="الاسم كما يظهر في الوثيقة" className="h-12" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="dateOfBirth"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>تاريخ الميلاد *</FormLabel>
-                      <FormControl>
-                        <Input type="date" {...field} className="h-12" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="gender"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>الجنس *</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger className="h-12">
-                            <SelectValue placeholder="اختر الجنس" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="male">ذكر</SelectItem>
-                          <SelectItem value="female">أنثى</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={form.control}
-                name="documentNumber"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>رقم الوثيقة *</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="أدخل رقم الوثيقة" className="h-12" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="documentIssueDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>تاريخ الإصدار *</FormLabel>
-                      <FormControl>
-                        <Input type="date" {...field} className="h-12" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="documentExpiryDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>تاريخ الانتهاء *</FormLabel>
-                      <FormControl>
-                        <Input type="date" {...field} className="h-12" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="flex gap-3">
-                <Button
-                  type="button"
-                  onClick={prevStep}
-                  variant="outline"
-                  className="h-12"
-                >
-                  <ChevronRight className="h-5 w-5" />
-                  السابق
-                </Button>
-                <Button
-                  type="button"
-                  onClick={nextStep}
-                  className="flex-1 h-12 bg-primary hover:bg-primary/90"
-                >
-                  متابعة
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {step === 3 && (
             <div className="space-y-6">
               <div className="text-center mb-6">
                 <h3 className="text-2xl font-bold mb-2">تحميل مستند</h3>
