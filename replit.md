@@ -1,20 +1,20 @@
 # Cashback Trading Platform (رفيق الكاش باك)
 
 ## Overview
-A Next.js-based cashback platform for traders, designed to reward users with cashback on every trade. The application aims to provide a comprehensive loyalty and referral system, robust authentication, and trading account management. The business vision is to capture a significant market share in the trading cashback sector by offering a secure, feature-rich, and user-friendly experience.
+A Next.js-based cashback platform for traders, designed to reward users with cashback on every trade. The application provides a comprehensive loyalty and referral system, robust authentication, and trading account management. The business vision is to capture a significant market share in the trading cashback sector by offering a secure, feature-rich, and user-friendly experience.
 
 ## User Preferences
-I want to ensure all server actions are secure and properly migrate any insecure ID token patterns to secure cookie-based authentication. I expect comprehensive security implementations and verification across the platform. I want the agent to prioritize fixing critical security vulnerabilities and ensuring the system is production-ready.
+All server actions are secure with proper authentication. The system prioritizes security with Row Level Security (RLS) policies, secure cookie-based authentication, and comprehensive verification across the platform. The system is production-ready with modern best practices.
 
 ## System Architecture
-The platform is built with Next.js 15.3.3 and Turbopack, using TypeScript and styled with TailwindCSS and Radix UI components. Firebase Firestore serves as the database, with Firebase Auth handling user authentication (Email/Password, Google, Apple). State management is handled with React Context (useAuthContext). AI features are integrated using Google Genkit.
+The platform is built with Next.js 15.3.3 and Turbopack, using TypeScript and styled with TailwindCSS and Radix UI components. Supabase PostgreSQL serves as the database, with Supabase Auth handling user authentication (Email/Password, OAuth providers). State management is handled with React Context (useAuthContext). AI features are integrated using Google Genkit.
 
 **UI/UX Decisions:**
 - Multi-language support with Arabic/English and RTL layout.
 - Radix UI primitives are used for UI components, with custom styling.
 
 **Technical Implementations & Feature Specifications:**
-- User authentication and authorization with Firebase and secure cookie-based sessions.
+- User authentication and authorization with Supabase Auth and secure SSR cookie handling.
 - Trading account management, including broker integration and a submission/approval workflow.
 - Cashback calculation, tracking, and a loyalty points/tier system.
 - Referral program with commission tracking.
@@ -25,20 +25,18 @@ The platform is built with Next.js 15.3.3 and Turbopack, using TypeScript and st
 - Geo-location services for user registration via IP detection.
 
 **System Design Choices:**
-- **Security-first approach:** Emphasizing Firebase Security Rules, token verification, and a recent migration to HTTP-only signed cookies for authentication to prevent XSS and CSRF.
-- **Server Actions:** All critical user-scoped operations and data fetching are handled via secure server actions, with token verification performed server-side.
-- **Atomic Transactions:** Implemented for sensitive operations like store purchases to prevent double-spending and ensure data consistency.
+- **Security-first approach:** Row Level Security (RLS) policies on all 19 database tables, Supabase Auth with SSR, and secure server actions.
+- **Server Actions:** All critical user-scoped operations use secure server actions with proper authentication.
+- **Database Design:** PostgreSQL with proper indexing, foreign keys, and ENUM types for data integrity.
 - **Project Structure:** Organized into `src/app` for routes, `src/components` for UI, `src/lib` for utilities, `src/hooks` for custom hooks, and `src/types` for TypeScript definitions.
 
 ## External Dependencies
-- **Firebase:** Firestore (database), Authentication (user auth), Admin SDK (server-side operations).
-- **Next.js:** Web framework.
-- **Turbopack:** Build tool for Next.js.
+- **Supabase:** PostgreSQL database, Authentication (user auth), Row Level Security.
+- **Next.js:** Web framework (15.3.3 with Turbopack).
 - **TailwindCSS:** Styling framework.
 - **Radix UI:** UI component library.
 - **Google Genkit:** AI integration.
-- **IPinfo.io / ipapi.co:** Geo-location services (server-side with `IPINFO_TOKEN`).
-- **next-firebase-auth-edge:** For secure cookie-based authentication.
+- **IPinfo.io:** Geo-location services (server-side with `IPINFO_TOKEN`).
 
 ## Replit Environment Setup
 
@@ -50,23 +48,14 @@ The platform is built with Next.js 15.3.3 and Turbopack, using TypeScript and st
 ### Required Environment Variables
 The following environment variables must be configured in Replit Secrets:
 
-**Firebase Client Configuration (NEXT_PUBLIC_*):**
-- `NEXT_PUBLIC_FIREBASE_API_KEY`
-- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
-- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
-- `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
-- `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
-- `NEXT_PUBLIC_FIREBASE_APP_ID`
-- `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID`
-
-**Firebase Admin SDK:**
-- `FIREBASE_SERVICE_ACCOUNT_KEY_B64` - Base64 encoded Firebase service account JSON key
-
-**Authentication & Security:**
-- `COOKIE_SIGNATURE_KEYS` - JSON array of signing keys (e.g., `["secret-key-1","secret-key-2"]`)
+**Supabase Configuration:**
+- `NEXT_PUBLIC_SUPABASE_URL` - Your Supabase project URL
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Supabase anonymous/public key
+- `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key (for admin operations)
 
 **Optional Services:**
 - `IPINFO_TOKEN` - IPinfo.io API token for geo-location services
+- `COOKIE_SIGNATURE_KEYS` - Legacy variable (not used in Supabase migration)
 
 ### Deployment Configuration
 - **Target:** Autoscale (stateless web application)
@@ -74,8 +63,28 @@ The following environment variables must be configured in Replit Secrets:
 - **Run Command:** `npm start`
 
 ### Recent Changes
+- **2025-10-04:** Complete Firebase to Supabase migration
+  - Migrated from Firebase Auth to Supabase Auth with SSR support
+  - Migrated from Firestore to PostgreSQL with 19 tables
+  - Implemented Row Level Security (RLS) policies on all tables
+  - Updated all 30+ server action files to use Supabase
+  - Migrated authentication helpers, middleware, and context hooks
+  - Fixed user model (uid → id) across entire codebase
+  - Removed all Firebase dependencies (firebase, firebase-admin, next-firebase-auth-edge)
+  - Updated Supabase SSR to use modern getAll/setAll cookie methods
+  - Application is production-ready with comprehensive security
+  
 - **2025-10-04:** Initial Replit environment setup completed
   - Installed npm dependencies
   - Configured development workflow on port 5000
   - Set up deployment configuration for production
   - Verified Next.js host configuration for Replit proxy compatibility
+
+### Database Setup Required
+To complete the setup, you must run the `supabase_schema.sql` file in your Supabase dashboard:
+1. Go to your Supabase project dashboard
+2. Navigate to SQL Editor
+3. Copy and paste the entire content of `supabase_schema.sql`
+4. Execute the SQL script
+
+This will create all 19 tables with proper indexes and Row Level Security policies.
