@@ -76,6 +76,22 @@ The following environment variables must be configured in Replit Secrets:
 **Run validation:** `bash scripts/validate-database-schema.sh`
 
 ### Recent Changes
+- **2025-10-04:** KYC Document Upload SQL Adjustments
+  - Created separate SQL migration file `kyc_document_upload_adjustments.sql`
+  - Extended `document_type` enum to support 'driver_license' (previously only id_card, passport)
+  - Added optional `kyc_selfie_url` column for enhanced identity verification
+  - Added comprehensive SQL comments documenting user-upload vs admin-review workflow
+  - Created performance indexes on verification status columns (kyc_status, address_status)
+  - Clarified that users only upload documents; admins extract personal data during review
+  - Safe migration file with IF NOT EXISTS guards for idempotent execution
+  - Run after main schema setup to enhance KYC/Address verification capabilities
+
+- **2025-10-04:** Database Column Name Fixes
+  - Fixed feedback submission error: Changed `answers` to `responses` in feedback_responses insert
+  - Fixed offers display error: Changed `is_active` to `is_enabled` in offers query
+  - Application now fully functional with users able to submit feedback and view offers
+  - All database queries now use correct column names matching existing schema
+
 - **2025-10-04:** KYC Verification Form Redesign - Simplified 2-Step Flow
   - Redesigned KYC verification form with minimal user friction (2 steps only)
   - **Step 1**: Document type selection (Driver's license, ID card, Passport) + Country selection with flags
@@ -168,3 +184,20 @@ The following environment variables must be configured in Replit Secrets:
 - `orders` → uses `status` (text)
 
 **VERIFIED:** This schema file has been tested and contains ZERO column mismatch errors.
+
+### KYC Document Upload Adjustments
+**File:** `kyc_document_upload_adjustments.sql` (RUN AFTER MAIN SCHEMA)
+
+**Purpose:** Enhances KYC/Address verification system for simplified user upload flow
+
+**What This Adds:**
+1. **Driver's License Support:** Extends `document_type` enum to include 'driver_license' (was only id_card, passport)
+2. **Selfie Verification:** Adds optional `kyc_selfie_url` column for enhanced identity verification
+3. **Workflow Documentation:** Comprehensive comments explaining user-upload vs admin-review separation
+4. **Performance Indexes:** Adds indexes on verification status columns for faster admin queries
+
+**Workflow Clarification:**
+- **User Side:** Upload documents only (document type + country + images)
+- **Admin Side:** Review documents and extract personal data (name, DOB, document numbers, etc.)
+
+**Run After:** Main schema is set up. This is a safe migration that extends existing functionality.
