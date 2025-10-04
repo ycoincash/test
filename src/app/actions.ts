@@ -136,8 +136,11 @@ export async function handleLogout() {
 export async function handleForgotPassword(email: string) {
     try {
         const supabase = await createClient();
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 
+                       (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS}` : 'http://localhost:5000');
+        
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-            redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/reset-password`,
+            redirectTo: `${siteUrl}/reset-password`,
         });
         
         if (error) {
@@ -507,7 +510,35 @@ export async function placeOrder(
 }
 
 export async function sendVerificationEmail(): Promise<{ success: boolean; error?: string }> {
-    return { success: false, error: 'Email verification is handled by Supabase automatically.' };
+    try {
+        const user = await getAuthenticatedUser();
+        
+        if (!user || !user.email) {
+            return { success: false, error: 'User not found or no email associated.' };
+        }
+
+        const supabase = await createClient();
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 
+                       (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS}` : 'http://localhost:5000');
+        
+        const { error } = await supabase.auth.resend({
+            type: 'signup',
+            email: user.email,
+            options: {
+                emailRedirectTo: `${siteUrl}/auth/callback`
+            }
+        });
+
+        if (error) {
+            console.error('Error sending verification email:', error);
+            return { success: false, error: 'Failed to send verification email. Please try again.' };
+        }
+
+        return { success: true };
+    } catch (error: any) {
+        console.error('Send verification email error:', error);
+        return { success: false, error: 'An unexpected error occurred.' };
+    }
 }
 
 export async function submitKycData(data: Omit<KycData, 'status' | 'submittedAt'>): Promise<{ success: boolean; error?: string }> {
