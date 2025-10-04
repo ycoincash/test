@@ -43,10 +43,10 @@ export interface BannerSettings {
 }
 
 /**
- * Represents a user document in the 'users' collection.
+ * Represents a user document in the 'users' table.
  */
 export interface UserProfile {
-    uid: string; // Document ID, same as Firebase Auth UID
+    id: string; // UUID from Supabase Auth
     email: string;
     name: string;
     role: 'user' | 'admin';
@@ -62,8 +62,8 @@ export interface UserProfile {
     addressData?: AddressData;
     // Referral fields
     referralCode?: string;
-    referredBy?: string | null; // UID of the user who referred this person
-    referrals?: string[]; // Array of UIDs of users this person has referred
+    referredBy?: string | null; // ID of the user who referred this person
+    referrals?: string[]; // Array of IDs of users this person has referred
     // New Level System
     level: number; // Level 1-6
     monthlyEarnings?: number; // For level calculation

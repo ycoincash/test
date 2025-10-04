@@ -405,6 +405,22 @@ ALTER TABLE contact_settings ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Contact settings are publicly readable" ON contact_settings
     FOR SELECT USING (true);
 
+ALTER TABLE banner_settings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Banner settings are publicly readable" ON banner_settings
+    FOR SELECT USING (true);
+
+ALTER TABLE offers ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enabled offers are publicly readable" ON offers
+    FOR SELECT USING (is_enabled = true);
+
+ALTER TABLE admin_notifications ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Admin notifications are admin only" ON admin_notifications
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM users WHERE users.id = auth.uid() AND users.role = 'admin'
+        )
+    );
+
 -- Insert default contact settings
 INSERT INTO contact_settings (id, email, phone, address, social)
 VALUES ('contact', '', '', '', '{}')

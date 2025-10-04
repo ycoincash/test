@@ -50,7 +50,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         if (!error && userProfile) {
             profile = {
-                uid: supabaseUser.id,
+                id: supabaseUser.id,
                 email: userProfile.email,
                 name: userProfile.name,
                 role: userProfile.role,
