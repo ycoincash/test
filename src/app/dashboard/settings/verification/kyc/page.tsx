@@ -4,7 +4,7 @@ import { useAuthContext } from "@/hooks/useAuthContext";
 import { useRouter } from "next/navigation";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { KycVerificationForm } from "@/components/verification/KycVerificationForm";
+import { KycSimpleUpload } from "@/components/verification/KycSimpleUpload";
 import { PageHeader } from "@/components/shared/PageHeader";
 
 export default function KycVerificationPage() {
@@ -44,10 +44,9 @@ export default function KycVerificationPage() {
                 description="قم برفع وثيقة هويتك الرسمية للتحقق من حسابك"
             />
 
-            <KycVerificationForm
+            <KycSimpleUpload
                 onSuccess={handleSuccess}
                 onCancel={handleCancel}
-                userCountry={user.profile.country}
             />
         </div>
     );
