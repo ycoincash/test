@@ -73,7 +73,14 @@ export interface UserProfile {
 export interface KycData {
     documentType: 'id_card' | 'passport';
     documentNumber: string;
+    fullName: string;
+    dateOfBirth: Date;
+    nationality: string;
+    documentIssueDate: Date;
+    documentExpiryDate: Date;
     gender: 'male' | 'female';
+    documentFrontUrl: string;
+    documentBackUrl?: string;
     status: 'Pending' | 'Verified' | 'Rejected';
     submittedAt: Date;
     rejectionReason?: string;
@@ -83,6 +90,9 @@ export interface AddressData {
     country: string;
     city: string;
     streetAddress: string;
+    stateProvince?: string;
+    postalCode: string;
+    documentUrl: string;
     status: 'Pending' | 'Verified' | 'Rejected';
     submittedAt: Date;
     rejectionReason?: string;
