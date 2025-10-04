@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { logUserActivity } from '@/app/admin/actions'
-import { getClientSessionInfo } from '@/lib/device-info'
+import { getServerSessionInfo } from '@/lib/server-session-info'
 
 export async function POST() {
   try {
@@ -10,7 +10,7 @@ export async function POST() {
     const { data: { user } } = await supabase.auth.getUser()
     
     if (user) {
-      const clientInfo = await getClientSessionInfo()
+      const clientInfo = await getServerSessionInfo()
       await logUserActivity(user.id, 'logout', clientInfo)
     }
     

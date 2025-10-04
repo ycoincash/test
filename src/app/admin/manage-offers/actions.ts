@@ -2,7 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase/server';
 import type { Offer, UserProfile } from '@/types';
-import { getClientSessionInfo } from '@/lib/device-info';
+import { getServerSessionInfo } from '@/lib/server-session-info';
 
 
 export async function addOffer(data: Omit<Offer, 'id'>) {
@@ -121,7 +121,7 @@ export async function getOffersForUser(user: UserProfile | undefined): Promise<O
     try {
         if (!user) return [];
         
-        const { geoInfo } = await getClientSessionInfo();
+        const { geoInfo } = await getServerSessionInfo();
         const userCountry = geoInfo.country;
 
         const supabase = await createAdminClient();

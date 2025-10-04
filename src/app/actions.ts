@@ -8,7 +8,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { getAuthenticatedUser } from '@/lib/auth/server-auth';
 import { generateReferralCode } from "@/lib/referral";
 import { logUserActivity } from "./admin/actions";
-import { getClientSessionInfo } from "@/lib/device-info";
+import { getServerSessionInfo } from "@/lib/server-session-info";
 import { getCountryFromHeaders } from "@/lib/server-geo";
 import type { Order, Product, ProductCategory, CashbackTransaction, KycData, AddressData, FeedbackForm, ClientLevel, Notification, FeedbackResponse, Withdrawal, TradingAccount, UserProfile, BlogPost, DeviceInfo, GeoInfo } from "@/types";
 

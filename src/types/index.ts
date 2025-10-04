@@ -75,7 +75,7 @@ export interface KycData {
     documentNumber: string;
     gender: 'male' | 'female';
     status: 'Pending' | 'Verified' | 'Rejected';
-    submittedAt: Date | Timestamp;
+    submittedAt: Date;
     rejectionReason?: string;
 }
 
@@ -84,7 +84,7 @@ export interface AddressData {
     city: string;
     streetAddress: string;
     status: 'Pending' | 'Verified' | 'Rejected';
-    submittedAt: Date | Timestamp;
+    submittedAt: Date;
     rejectionReason?: string;
 }
 
@@ -372,7 +372,7 @@ export interface GeoInfo {
 export interface ActivityLog {
     id: string;
     userId: string;
-    event: 'login' | 'signup' | 'withdrawal_request' | 'store_purchase';
+    event: 'login' | 'logout' | 'signup' | 'withdrawal_request' | 'store_purchase';
     timestamp: Date;
     ipAddress: string;
     userAgent: string;
