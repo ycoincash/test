@@ -1,6 +1,4 @@
 
-import type { Timestamp } from "firebase/firestore";
-
 /**
  * Represents the settings for a promotional offer.
  */
