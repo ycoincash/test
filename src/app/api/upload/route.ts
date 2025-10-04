@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { uploadDocument, validateDocumentFile } from '@/lib/storage';
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/heic', 'image/webp', 'application/pdf'];
 
 export async function POST(request: NextRequest) {
   try {
@@ -46,26 +48,62 @@ export async function POST(request: NextRequest) {
       documentType
     });
 
-    const validation = validateDocumentFile(file);
-    if (!validation.valid) {
-      console.error('❌ Validation failed:', validation.error);
+    // Validate file
+    if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json(
-        { success: false, error: validation.error },
+        { success: false, error: 'File too large (max 10MB)' },
+        { status: 400 }
+      );
+    }
+
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid file type' },
         { status: 400 }
       );
     }
 
     console.log('✅ File validation passed');
 
-    const result = await uploadDocument(file, user.id, documentType);
-    
-    if (result.success) {
-      console.log('✅ Upload completed successfully:', result.url);
-      return NextResponse.json(result);
-    } else {
-      console.error('❌ Upload failed:', result.error);
-      return NextResponse.json(result, { status: 500 });
+    // Convert File to ArrayBuffer
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // Generate unique filename
+    const timestamp = Date.now();
+    const ext = file.name.split('.').pop() || 'jpg';
+    const fileName = `${user.id}/${documentType}_${timestamp}.${ext}`;
+
+    console.log('📤 Uploading to Supabase Storage:', fileName);
+
+    // Upload to Supabase Storage (native client, no SSL issues)
+    const { data, error } = await supabase.storage
+      .from('verification-documents')
+      .upload(fileName, buffer, {
+        contentType: file.type,
+        upsert: true
+      });
+
+    if (error) {
+      console.error('❌ Supabase upload error:', error);
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 500 }
+      );
     }
+
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('verification-documents')
+      .getPublicUrl(fileName);
+
+    console.log('✅ Upload successful:', publicUrl);
+
+    return NextResponse.json({
+      success: true,
+      url: publicUrl
+    });
+
   } catch (error) {
     console.error('❌ Error in upload API:', error);
     return NextResponse.json(
