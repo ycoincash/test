@@ -29,11 +29,11 @@ task = "shell.exec"
 args = "npm run dev"
 waitForPort = 5000
 
-[[ports]]
-localPort = 37729
-externalPort = 80
-
 [deployment]
 deploymentTarget = "autoscale"
 run = ["npm", "start"]
 build = ["npm", "run", "build"]
+
+[[ports]]
+localPort = 40873
+externalPort = 80

@@ -35,7 +35,7 @@ const nextConfig = {
       },
     ],
   },
-  allowedDevOrigins: ['*.replit.dev'],
+  allowedDevOrigins: ['*.replit.dev', '*.janeway.replit.dev'],
   serverExternalPackages: ['xlsx'],
 };
 
