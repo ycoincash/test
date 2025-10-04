@@ -52,7 +52,7 @@ const licenseSchema = z.object({
 });
 
 const formSchema = z.object({
-  logoUrl: z.string().url("يجب أن يكون رابطًا صالحًا.").default("https://placehold.co/100x100.png"),
+  logoUrl: z.string().url("يجب أن يكون رابطًا صالحًا.").or(z.literal("")).transform(val => val || "https://placehold.co/100x100.png").default("https://placehold.co/100x100.png"),
   category: z.enum(['forex', 'crypto', 'other']).default('forex'),
   
   basicInfo: z.object({

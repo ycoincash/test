@@ -101,14 +101,20 @@ function SortableBrokerRow({ broker, onSuccess }: { broker: Broker, onSuccess: (
         </div>
       </TableCell>
       <TableCell>
-        <Image
-          src={broker.logoUrl}
-          alt={`${brokerName} logo`}
-          width={32}
-          height={32}
-          className="rounded-md border p-0.5 bg-white"
-          data-ai-hint="logo"
-        />
+        {broker.logoUrl ? (
+          <Image
+            src={broker.logoUrl}
+            alt={`${brokerName} logo`}
+            width={32}
+            height={32}
+            className="rounded-md border p-0.5 bg-white"
+            data-ai-hint="logo"
+          />
+        ) : (
+          <div className="w-8 h-8 rounded-md border bg-muted flex items-center justify-center text-xs text-muted-foreground">
+            N/A
+          </div>
+        )}
       </TableCell>
       <TableCell className="font-medium">{brokerName}</TableCell>
       <TableCell>
