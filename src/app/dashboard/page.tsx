@@ -189,20 +189,20 @@ function PromoBanner() {
             return;
         }
         const checkTargeting = async () => {
-            const { targetCountries, targetTiers, targetStatuses } = settings;
+            const { targetCountries, targetLevels, targetStatuses } = settings;
             const { geoInfo } = await getClientSessionInfo();
             const userCountry = geoInfo.country;
 
             const hasCountryTargeting = targetCountries && targetCountries.length > 0;
             const countryMatch = !hasCountryTargeting || (userCountry && targetCountries.includes(userCountry)) || !userCountry;
 
-            const hasTierTargeting = targetTiers && targetTiers.length > 0;
-            const tierMatch = !hasTierTargeting || targetTiers.includes(String(user.profile!.level));
+            const hasLevelTargeting = targetLevels && targetLevels.length > 0;
+            const levelMatch = !hasLevelTargeting || targetLevels.includes(String(user.profile!.level));
 
             const hasStatusTargeting = targetStatuses && targetStatuses.length > 0;
             const statusMatch = !hasStatusTargeting || targetStatuses.includes(user.profile!.status);
 
-            setIsBannerVisible(countryMatch && tierMatch && statusMatch);
+            setIsBannerVisible(countryMatch && levelMatch && statusMatch);
         };
 
         checkTargeting();

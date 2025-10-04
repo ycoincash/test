@@ -372,9 +372,15 @@ CREATE TABLE IF NOT EXISTS contact_settings (
 CREATE TABLE IF NOT EXISTS banner_settings (
     id TEXT PRIMARY KEY DEFAULT 'banner',
     is_enabled BOOLEAN DEFAULT FALSE,
-    message TEXT,
-    type TEXT,
-    link TEXT
+    type TEXT DEFAULT 'text',
+    title TEXT,
+    text TEXT,
+    cta_text TEXT,
+    cta_link TEXT,
+    script_code TEXT,
+    target_levels TEXT[] DEFAULT ARRAY[]::TEXT[],
+    target_countries TEXT[] DEFAULT ARRAY[]::TEXT[],
+    target_statuses TEXT[] DEFAULT ARRAY[]::TEXT[]
 );
 
 -- Offers table
@@ -382,11 +388,14 @@ CREATE TABLE IF NOT EXISTS offers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     title TEXT NOT NULL,
     description TEXT,
-    discount_percentage NUMERIC(5, 2),
-    is_active BOOLEAN DEFAULT TRUE,
-    target_user_ids UUID[] DEFAULT ARRAY[]::UUID[],
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    expires_at TIMESTAMPTZ
+    is_enabled BOOLEAN DEFAULT TRUE,
+    type TEXT DEFAULT 'text',
+    cta_text TEXT,
+    cta_link TEXT,
+    script_code TEXT,
+    target_levels TEXT[] DEFAULT ARRAY[]::TEXT[],
+    target_countries TEXT[] DEFAULT ARRAY[]::TEXT[],
+    target_statuses TEXT[] DEFAULT ARRAY[]::TEXT[]
 );
 
 -- Row Level Security (RLS) Policies
