@@ -1,54 +1,42 @@
 import 'server-only';
-import { cookies } from 'next/headers';
-import { getTokens } from 'next-firebase-auth-edge';
-import { getServerConfig } from '@/lib/firebase/auth-edge-config';
+import { createClient } from '@/lib/supabase/server';
 
 export interface AuthenticatedUser {
   uid: string;
   email: string | null;
   emailVerified: boolean;
-  customClaims?: {
-    admin?: boolean;
-    [key: string]: any;
-  };
+  role?: 'user' | 'admin';
 }
 
 /**
- * Get authenticated user from HTTP-only cookies in server actions
+ * Get authenticated user from Supabase session in server actions
  * Throws an error if no valid session exists
  */
 export async function getAuthenticatedUser(): Promise<AuthenticatedUser> {
-  const cookieStore = await cookies();
-  const config = getServerConfig();
+  const supabase = await createClient();
   
-  const token = cookieStore.get(config.cookieName)?.value;
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
   
-  if (!token) {
-    throw new Error('Unauthorized: No session cookie found');
+  if (authError || !user) {
+    throw new Error('Unauthorized: No valid session found');
   }
 
   try {
-    const tokens = await getTokens(cookieStore, {
-      serviceAccount: config.serviceAccount,
-      apiKey: config.apiKey,
-      cookieName: config.cookieName,
-      cookieSignatureKeys: config.cookieSignatureKeys,
-      cookieSerializeOptions: config.cookieSerializeOptions,
-    });
-
-    if (!tokens) {
-      throw new Error('No valid tokens found');
-    }
+    const { data: userProfile } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .single();
 
     return {
-      uid: tokens.decodedToken.uid,
-      email: tokens.decodedToken.email || null,
-      emailVerified: tokens.decodedToken.email_verified || false,
-      customClaims: tokens.decodedToken as any,
+      uid: user.id,
+      email: user.email || null,
+      emailVerified: user.email_confirmed_at != null,
+      role: userProfile?.role || 'user',
     };
   } catch (error) {
-    console.error('Failed to verify session token:', error);
-    throw new Error('Unauthorized: Invalid session token');
+    console.error('Failed to fetch user profile:', error);
+    throw new Error('Unauthorized: Invalid session');
   }
 }
 

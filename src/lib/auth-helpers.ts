@@ -1,9 +1,9 @@
 import { headers } from 'next/headers';
-import { adminAuth } from './firebase/admin-config';
+import { createAdminClient } from './supabase/server';
 
 /**
- * Verifies the Firebase ID token from the Authorization header
- * Returns the decoded token if valid, throws error if invalid
+ * Verifies the Supabase auth token from the Authorization header
+ * Returns the user if valid, throws error if invalid
  * NOTE: This only works with API routes, not Server Actions
  */
 export async function verifyAuthToken() {
@@ -17,8 +17,14 @@ export async function verifyAuthToken() {
   const token = authHeader.split('Bearer ')[1];
   
   try {
-    const decodedToken = await adminAuth.verifyIdToken(token);
-    return decodedToken;
+    const supabase = await createAdminClient();
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    
+    if (error || !user) {
+      throw new Error('Invalid token');
+    }
+    
+    return user;
   } catch (error) {
     console.error('Token verification failed:', error);
     throw new Error('Invalid or expired token');
@@ -36,10 +42,19 @@ export async function verifyAdminByUid(uid: string) {
   }
   
   try {
-    const userRecord = await adminAuth.getUser(uid);
-    const customClaims = userRecord.customClaims || {};
+    const supabase = await createAdminClient();
     
-    if (!customClaims.admin) {
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', uid)
+      .single();
+    
+    if (error || !user) {
+      throw new Error('User not found');
+    }
+    
+    if (user.role !== 'admin') {
       throw new Error('Unauthorized: Admin access required');
     }
     
@@ -55,13 +70,20 @@ export async function verifyAdminByUid(uid: string) {
  * Throws error if not authenticated or not an admin
  */
 export async function verifyAdminToken() {
-  const decodedToken = await verifyAuthToken();
+  const user = await verifyAuthToken();
   
-  if (!decodedToken.admin) {
+  const supabase = await createAdminClient();
+  const { data: userProfile } = await supabase
+    .from('users')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+  
+  if (!userProfile || userProfile.role !== 'admin') {
     throw new Error('Unauthorized: Admin access required');
   }
   
-  return decodedToken;
+  return user;
 }
 
 /**
@@ -70,8 +92,8 @@ export async function verifyAdminToken() {
  */
 export async function getCurrentUserId(): Promise<string | null> {
   try {
-    const decodedToken = await verifyAuthToken();
-    return decodedToken.uid;
+    const user = await verifyAuthToken();
+    return user.id;
   } catch {
     return null;
   }
@@ -79,8 +101,8 @@ export async function getCurrentUserId(): Promise<string | null> {
 
 /**
  * Verifies an ID token passed from the client (for Server Actions)
- * @param idToken The Firebase ID token from the client
- * @returns The decoded token containing uid and custom claims
+ * @param idToken The Supabase access token from the client
+ * @returns The user object
  * @throws Error if token is invalid or expired
  */
 export async function verifyClientIdToken(idToken: string) {
@@ -89,8 +111,14 @@ export async function verifyClientIdToken(idToken: string) {
   }
   
   try {
-    const decodedToken = await adminAuth.verifyIdToken(idToken);
-    return decodedToken;
+    const supabase = await createAdminClient();
+    const { data: { user }, error } = await supabase.auth.getUser(idToken);
+    
+    if (error || !user) {
+      throw new Error('Invalid token');
+    }
+    
+    return user;
   } catch (error) {
     console.error('Client ID token verification failed:', error);
     throw new Error('Invalid or expired authentication token');
@@ -102,11 +130,18 @@ export async function verifyClientIdToken(idToken: string) {
  * @param resourceUserId The userId field from the resource
  */
 export async function verifyResourceOwnership(resourceUserId: string) {
-  const decodedToken = await verifyAuthToken();
+  const user = await verifyAuthToken();
   
-  if (decodedToken.uid !== resourceUserId && !decodedToken.admin) {
+  const supabase = await createAdminClient();
+  const { data: userProfile } = await supabase
+    .from('users')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+  
+  if (user.id !== resourceUserId && userProfile?.role !== 'admin') {
     throw new Error('Unauthorized: You do not have permission to access this resource');
   }
   
-  return decodedToken;
+  return user;
 }

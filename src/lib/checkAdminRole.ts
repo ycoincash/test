@@ -1,25 +1,36 @@
+'use client';
 
-import { auth } from "@/lib/firebase/config";
+import { createClient } from '@/lib/supabase/client';
 
 /**
- * Checks if the currently signed-in user has an 'admin' custom claim.
- * This is the most secure way to check for admin role on the client-side,
- * as custom claims are verified and included in the user's ID token by Firebase itself.
+ * Checks if the currently signed-in user has an 'admin' role.
+ * This checks the user's role in the users table.
  *
  * @returns A promise that resolves to true if the user is an admin, otherwise false.
  */
 export async function checkAdminRole(): Promise<boolean> {
-  const currentUser = auth.currentUser;
-  if (!currentUser) {
+  const supabase = createClient();
+  
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  
+  if (authError || !user) {
     return false;
   }
 
   try {
-    // Force a token refresh to get the latest custom claims.
-    const idTokenResult = await currentUser.getIdTokenResult(true); 
-    return idTokenResult.claims.admin === true;
+    const { data: userProfile, error } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+    
+    if (error || !userProfile) {
+      return false;
+    }
+    
+    return userProfile.role === 'admin';
   } catch (error) {
-    console.error("Error checking admin role via custom claims:", error);
+    console.error("Error checking admin role:", error);
     return false;
   }
 }

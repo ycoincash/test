@@ -1,26 +1,22 @@
 'use client';
 
-import { auth } from './firebase/config';
+import { createClient } from './supabase/client';
 
 /**
- * Gets the current user's Firebase ID token
+ * Gets the current user's Supabase access token
  * This token should be passed to server actions for authentication
  * @throws Error if user is not authenticated
  */
 export async function getCurrentUserIdToken(): Promise<string> {
-  const user = auth.currentUser;
+  const supabase = createClient();
   
-  if (!user) {
+  const { data: { session }, error } = await supabase.auth.getSession();
+  
+  if (error || !session) {
     throw new Error('User not authenticated');
   }
   
-  try {
-    const idToken = await user.getIdToken();
-    return idToken;
-  } catch (error) {
-    console.error('Failed to get ID token:', error);
-    throw new Error('Failed to get authentication token');
-  }
+  return session.access_token;
 }
 
 /**
