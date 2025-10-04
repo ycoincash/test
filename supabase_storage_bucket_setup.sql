@@ -20,10 +20,8 @@ VALUES (
 )
 ON CONFLICT (id) DO NOTHING;
 
--- Step 2: Enable RLS on storage.objects (if not already enabled)
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
-
--- Step 3: Create Storage Policies
+-- Step 2: Create Storage Policies
+-- Note: RLS is already enabled by default on storage.objects in Supabase
 
 -- Policy 1: Allow authenticated users to upload their own verification documents
 -- File path structure: {user_id}/kyc_front_{timestamp}.jpg
