@@ -23,11 +23,23 @@ export async function uploadDocument(
   documentType: 'kyc_front' | 'kyc_back' | 'address_proof'
 ): Promise<UploadResult> {
   try {
+    console.log('📤 Starting document upload:', {
+      fileName: file.name,
+      fileSize: file.size,
+      fileType: file.type,
+      userId,
+      documentType,
+      bucket: BUCKET_NAME,
+      endpoint: process.env.S3_ENDPOINT
+    });
+
     const timestamp = Date.now();
     const fileExtension = file.name.split('.').pop();
     const key = `${userId}/${documentType}_${timestamp}.${fileExtension}`;
 
     const buffer = Buffer.from(await file.arrayBuffer());
+
+    console.log('📤 Uploading to S3 with key:', key);
 
     await s3Client.send(
       new PutObjectCommand({
@@ -39,10 +51,13 @@ export async function uploadDocument(
     );
 
     const url = `${process.env.S3_ENDPOINT}/${BUCKET_NAME}/${key}`;
+    console.log('✅ Upload successful! URL:', url);
     return { success: true, url };
   } catch (error) {
-    console.error('Error uploading document:', error);
-    return { success: false, error: 'Failed to upload document' };
+    console.error('❌ Error uploading document:', error);
+    console.error('Error details:', JSON.stringify(error, null, 2));
+    const errorMessage = error instanceof Error ? error.message : 'Failed to upload document';
+    return { success: false, error: errorMessage };
   }
 }
 
