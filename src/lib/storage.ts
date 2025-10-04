@@ -1,3 +1,29 @@
+/**
+ * S3 Storage Configuration for Document Uploads
+ * 
+ * Required Environment Variables (Set in Replit Secrets):
+ * 
+ * 1. S3_ENDPOINT - Your S3-compatible storage endpoint URL
+ *    Example: https://s3.us-west-1.amazonaws.com
+ *    Example (R2): https://[account-id].r2.cloudflarestorage.com
+ * 
+ * 2. S3_ACCESS_KEY_ID - S3 access key ID for authentication
+ *    Get from: AWS Console → IAM → Access Keys
+ * 
+ * 3. S3_SECRET_ACCESS_KEY - S3 secret access key for authentication
+ *    Get from: AWS Console → IAM → Access Keys
+ * 
+ * Setup Instructions:
+ * 1. Create S3 bucket named 'verification-documents'
+ * 2. Configure bucket policy for public read access (see supabase_storage_policies.sql)
+ * 3. Add environment variables to Replit Secrets
+ * 4. Restart the application
+ * 
+ * Architecture: Serverless (Next.js API Routes)
+ * - /api/upload - handles file uploads with progress tracking
+ * - Generated URLs are public and stored in PostgreSQL
+ */
+
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 
 const s3Client = new S3Client({
@@ -20,7 +46,7 @@ export interface UploadResult {
 export async function uploadDocument(
   file: File,
   userId: string,
-  documentType: 'kyc_front' | 'kyc_back' | 'address_proof'
+  documentType: 'kyc_front' | 'kyc_back' | 'kyc_selfie' | 'address_proof'
 ): Promise<UploadResult> {
   try {
     console.log('📤 Starting document upload:', {

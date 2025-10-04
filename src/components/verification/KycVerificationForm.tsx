@@ -19,6 +19,7 @@ const kycSchema = z.object({
   nationality: z.string().min(2, 'بلد الإصدار مطلوب'),
   documentFrontFile: z.instanceof(File, { message: 'صورة الوثيقة (الوجه الأمامي) مطلوبة' }),
   documentBackFile: z.instanceof(File).optional(),
+  selfieFile: z.instanceof(File, { message: 'صورة سيلفي مطلوبة' }),
 });
 
 type KycFormValues = z.infer<typeof kycSchema>;
@@ -40,6 +41,8 @@ export function KycVerificationForm({ onSuccess, onCancel, userCountry }: KycVer
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [frontPreview, setFrontPreview] = useState<string | null>(null);
   const [backPreview, setBackPreview] = useState<string | null>(null);
+  const [selfiePreview, setSelfiePreview] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
   const { toast } = useToast();
 
   const form = useForm<KycFormValues>({
@@ -56,15 +59,17 @@ export function KycVerificationForm({ onSuccess, onCancel, userCountry }: KycVer
 
   const handleFileChange = (
     file: File | undefined,
-    field: 'documentFrontFile' | 'documentBackFile'
+    field: 'documentFrontFile' | 'documentBackFile' | 'selfieFile'
   ) => {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
         if (field === 'documentFrontFile') {
           setFrontPreview(reader.result as string);
-        } else {
+        } else if (field === 'documentBackFile') {
           setBackPreview(reader.result as string);
+        } else if (field === 'selfieFile') {
+          setSelfiePreview(reader.result as string);
         }
       };
       reader.readAsDataURL(file);
@@ -72,72 +77,85 @@ export function KycVerificationForm({ onSuccess, onCancel, userCountry }: KycVer
     }
   };
 
-  const handleRemoveFile = (field: 'documentFrontFile' | 'documentBackFile') => {
+  const handleRemoveFile = (field: 'documentFrontFile' | 'documentBackFile' | 'selfieFile') => {
     if (field === 'documentFrontFile') {
       setFrontPreview(null);
       form.setValue('documentFrontFile', undefined as any);
-    } else {
+    } else if (field === 'documentBackFile') {
       setBackPreview(null);
       form.setValue('documentBackFile', undefined);
+    } else if (field === 'selfieFile') {
+      setSelfiePreview(null);
+      form.setValue('selfieFile', undefined as any);
     }
+  };
+
+  const uploadFileWithProgress = (
+    file: File,
+    documentType: string,
+    progressKey: string
+  ): Promise<{ success: boolean; url?: string; error?: string }> => {
+    return new Promise((resolve) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('documentType', documentType);
+
+      const xhr = new XMLHttpRequest();
+
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+          const percentage = Math.round((e.loaded / e.total) * 100);
+          setUploadProgress((prev) => ({ ...prev, [progressKey]: percentage }));
+        }
+      });
+
+      xhr.addEventListener('load', () => {
+        if (xhr.status === 200) {
+          const result = JSON.parse(xhr.responseText);
+          resolve(result);
+        } else {
+          resolve({ success: false, error: 'Upload failed' });
+        }
+      });
+
+      xhr.addEventListener('error', () => {
+        resolve({ success: false, error: 'Network error' });
+      });
+
+      xhr.open('POST', '/api/upload');
+      xhr.send(formData);
+    });
   };
 
   const onSubmit = async (data: KycFormValues) => {
     console.log('🚀 KYC Form submission started');
-    console.log('📋 Form data:', {
-      documentType: data.documentType,
-      nationality: data.nationality,
-      hasFrontFile: !!data.documentFrontFile,
-      frontFileSize: data.documentFrontFile?.size,
-      frontFileName: data.documentFrontFile?.name,
-      hasBackFile: !!data.documentBackFile,
-      backFileSize: data.documentBackFile?.size,
-      backFileName: data.documentBackFile?.name,
-    });
-    
     setIsSubmitting(true);
+    setUploadProgress({});
+    
     try {
-      console.log('📤 Creating FormData for front document...');
-      const frontFormData = new FormData();
-      frontFormData.append('file', data.documentFrontFile);
-      frontFormData.append('documentType', 'kyc_front');
-      
-      console.log('📤 Calling upload API for front document...');
-      const frontResponse = await fetch('/api/upload', {
-        method: 'POST',
-        body: frontFormData,
-      });
-      const frontResult = await frontResponse.json();
-      console.log('📤 Front upload result:', frontResult);
+      console.log('📤 Uploading front document...');
+      const frontResult = await uploadFileWithProgress(data.documentFrontFile, 'kyc_front', 'front');
 
       if (!frontResult.success) {
-        console.error('❌ Front upload failed:', frontResult.error);
         throw new Error(frontResult.error || 'فشل رفع الوثيقة الأمامية');
       }
-      
-      console.log('✅ Front upload successful:', frontResult.url);
 
       let backUrl: string | undefined;
       if (data.documentBackFile) {
-        console.log('📤 Creating FormData for back document...');
-        const backFormData = new FormData();
-        backFormData.append('file', data.documentBackFile);
-        backFormData.append('documentType', 'kyc_back');
-        
-        console.log('📤 Calling upload API for back document...');
-        const backResponse = await fetch('/api/upload', {
-          method: 'POST',
-          body: backFormData,
-        });
-        const backResult = await backResponse.json();
-        console.log('📤 Back upload result:', backResult);
+        console.log('📤 Uploading back document...');
+        const backResult = await uploadFileWithProgress(data.documentBackFile, 'kyc_back', 'back');
         
         if (!backResult.success) {
-          console.error('❌ Back upload failed:', backResult.error);
           throw new Error(backResult.error || 'فشل رفع الوثيقة الخلفية');
         }
         backUrl = backResult.url;
-        console.log('✅ Back upload successful:', backUrl);
+      }
+
+      console.log('📤 Uploading selfie...');
+      const selfieResult = await uploadFileWithProgress(data.selfieFile, 'kyc_selfie', 'selfie');
+      
+      if (!selfieResult.success) {
+        throw new Error(selfieResult.error || 'فشل رفع صورة السيلفي');
       }
 
       console.log('📡 Sending KYC data to API endpoint...');
@@ -149,14 +167,11 @@ export function KycVerificationForm({ onSuccess, onCancel, userCountry }: KycVer
           nationality: data.nationality,
           documentFrontUrl: frontResult.url,
           documentBackUrl: backUrl,
+          selfieUrl: selfieResult.url,
         }),
       });
 
-      console.log('📡 API response status:', response.status);
-
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ API request failed:', errorText);
         throw new Error('فشل إرسال بيانات التحقق');
       }
 
@@ -172,7 +187,7 @@ export function KycVerificationForm({ onSuccess, onCancel, userCountry }: KycVer
       });
     } finally {
       setIsSubmitting(false);
-      console.log('🏁 Form submission finished (isSubmitting = false)');
+      setUploadProgress({});
     }
   };
 
@@ -432,9 +447,101 @@ export function KycVerificationForm({ onSuccess, onCancel, userCountry }: KycVer
                 />
               )}
 
+              <FormField
+                control={form.control}
+                name="selfieFile"
+                render={({ field: { value, onChange, ...field } }) => (
+                  <FormItem>
+                    <FormControl>
+                      <div className="relative">
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/heic,image/webp"
+                          onChange={(e) => handleFileChange(e.target.files?.[0], 'selfieFile')}
+                          className="hidden"
+                          id="selfie-upload"
+                        />
+                        <label
+                          htmlFor="selfie-upload"
+                          className={`block border-2 border-dashed rounded-lg p-6 cursor-pointer transition-colors ${
+                            selfiePreview ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1 text-right">
+                              <p className="font-medium text-base mb-1">صورة سيلفي (لمطابقة الهوية)</p>
+                              {selfiePreview ? (
+                                <p className="text-sm text-primary">تم التحميل</p>
+                              ) : (
+                                <p className="text-sm text-primary">اختر من جهازك</p>
+                              )}
+                            </div>
+                            
+                            {selfiePreview ? (
+                              <div className="relative w-20 h-20 rounded-lg overflow-hidden border">
+                                <Image src={selfiePreview} alt="Selfie" fill className="object-cover" />
+                              </div>
+                            ) : (
+                              <div className="w-20 h-20 bg-muted rounded-lg flex items-center justify-center">
+                                <Upload className="h-8 w-8 text-muted-foreground" />
+                              </div>
+                            )}
+                          </div>
+                        </label>
+                        {selfiePreview && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute top-2 left-2"
+                            onClick={() => handleRemoveFile('selfieFile')}
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </Button>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <p className="text-xs text-muted-foreground text-center">
                 JPG, PNG, HEIC, WEBP أو PDF (الحد الأقصى 50 MB)
               </p>
+
+              {isSubmitting && Object.keys(uploadProgress).length > 0 && (
+                <div className="space-y-3 p-4 bg-muted/50 rounded-lg">
+                  <p className="text-sm font-medium text-center">جاري الرفع...</p>
+                  {uploadProgress.front !== undefined && (
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span>{uploadProgress.front}%</span>
+                        <span>الوجه الأمامي</span>
+                      </div>
+                      <Progress value={uploadProgress.front} className="h-2" />
+                    </div>
+                  )}
+                  {uploadProgress.back !== undefined && (
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span>{uploadProgress.back}%</span>
+                        <span>الوجه الخلفي</span>
+                      </div>
+                      <Progress value={uploadProgress.back} className="h-2" />
+                    </div>
+                  )}
+                  {uploadProgress.selfie !== undefined && (
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span>{uploadProgress.selfie}%</span>
+                        <span>صورة السيلفي</span>
+                      </div>
+                      <Progress value={uploadProgress.selfie} className="h-2" />
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="flex gap-3">
                 <Button
@@ -450,7 +557,7 @@ export function KycVerificationForm({ onSuccess, onCancel, userCountry }: KycVer
                 <Button
                   type="submit"
                   className="flex-1 h-12 bg-primary hover:bg-primary/90"
-                  disabled={isSubmitting || !frontPreview}
+                  disabled={isSubmitting || !frontPreview || !selfiePreview}
                 >
                   {isSubmitting ? (
                     <>

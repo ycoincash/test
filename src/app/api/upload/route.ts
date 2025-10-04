@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
 
     const formData = await request.formData();
     const file = formData.get('file') as File;
-    const documentType = formData.get('documentType') as 'kyc_front' | 'kyc_back' | 'address_proof';
+    const documentType = formData.get('documentType') as 'kyc_front' | 'kyc_back' | 'kyc_selfie' | 'address_proof';
 
     if (!file) {
       console.error('❌ Upload failed: No file provided');

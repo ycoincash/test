@@ -16,6 +16,7 @@ export async function POST(request: Request) {
       nationality,
       documentFrontUrl,
       documentBackUrl,
+      selfieUrl,
     } = body;
 
     // Update user's KYC data - personal info will be extracted by admin later
@@ -26,6 +27,7 @@ export async function POST(request: Request) {
         kyc_nationality: nationality,
         kyc_document_front_url: documentFrontUrl,
         kyc_document_back_url: documentBackUrl,
+        kyc_selfie_url: selfieUrl,
         kyc_status: 'Pending',
         kyc_submitted_at: new Date().toISOString(),
         kyc_rejection_reason: null,
