@@ -45,6 +45,31 @@ import { addBroker, updateBroker } from "@/app/admin/manage-brokers/actions";
 import { TermsBank } from "@/lib/terms-bank";
 import { createClient } from "@/lib/supabase/client";
 
+// Transform snake_case database fields to camelCase for TypeScript
+function transformBrokerFromDB(dbBroker: any): Broker {
+  return {
+    id: dbBroker.id,
+    order: dbBroker.order,
+    logoUrl: dbBroker.logo_url || dbBroker.logoUrl,
+    basicInfo: dbBroker.basic_info || dbBroker.basicInfo,
+    regulation: dbBroker.regulation,
+    tradingConditions: dbBroker.trading_conditions || dbBroker.tradingConditions,
+    platforms: dbBroker.platforms,
+    instruments: dbBroker.instruments,
+    depositsWithdrawals: dbBroker.deposits_withdrawals || dbBroker.depositsWithdrawals,
+    cashback: dbBroker.cashback,
+    globalReach: dbBroker.global_reach || dbBroker.globalReach,
+    reputation: dbBroker.reputation,
+    additionalFeatures: dbBroker.additional_features || dbBroker.additionalFeatures,
+    name: dbBroker.name,
+    description: dbBroker.description,
+    category: dbBroker.category,
+    rating: dbBroker.rating,
+    instructions: dbBroker.instructions,
+    existingAccountInstructions: dbBroker.existing_account_instructions || dbBroker.existingAccountInstructions,
+  };
+}
+
 const licenseSchema = z.object({
     authority: z.string().min(1, "جهة الترخيص مطلوبة"),
     licenseNumber: z.string().optional(),
@@ -286,7 +311,8 @@ export default function BrokerFormPage() {
                 if (error || !data) {
                     notFound();
                 } else {
-                    form.reset(getSafeDefaultValues({ id: data.id, ...data } as Broker));
+                    const broker = transformBrokerFromDB(data);
+                    form.reset(getSafeDefaultValues(broker));
                 }
                 setIsLoading(false);
             };
