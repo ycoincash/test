@@ -411,7 +411,7 @@ CREATE POLICY "Banner settings are publicly readable" ON banner_settings
 
 ALTER TABLE offers ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Enabled offers are publicly readable" ON offers
-    FOR SELECT USING (is_enabled = true);
+    FOR SELECT USING (is_active = true);
 
 ALTER TABLE admin_notifications ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Admin notifications are admin only" ON admin_notifications
