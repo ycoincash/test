@@ -76,12 +76,14 @@ function RejectDialog({ type, userId, onSuccess, isOpen, onOpenChange }: { type:
     );
 }
 
+type DocumentRequest = PendingVerification & { type: 'KYC' | 'Address' };
+
 export default function ManageVerificationsPage() {
     const [requests, setRequests] = useState<PendingVerification[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const { toast } = useToast();
     const [dialogState, setDialogState] = useState<{ isOpen: boolean; data: { userId: string, type: 'kyc' | 'address' | 'phone' } | null }>({ isOpen: false, data: null });
-    const [documentViewer, setDocumentViewer] = useState<{ isOpen: boolean; request: PendingVerification | null }>({ isOpen: false, request: null });
+    const [documentViewer, setDocumentViewer] = useState<{ isOpen: boolean; request: DocumentRequest | null }>({ isOpen: false, request: null });
 
     const fetchRequests = async () => {
         setIsLoading(true);
@@ -114,7 +116,9 @@ export default function ManageVerificationsPage() {
     }
 
     const handleViewDocuments = (request: PendingVerification) => {
-        setDocumentViewer({ isOpen: true, request });
+        if (request.type === 'KYC' || request.type === 'Address') {
+            setDocumentViewer({ isOpen: true, request });
+        }
     }
 
     const columns = getColumns(handleApprove, handleRejectRequest, handleViewDocuments);
