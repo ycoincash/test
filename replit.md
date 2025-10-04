@@ -63,6 +63,18 @@ The following environment variables must be configured in Replit Secrets:
 - **Run Command:** `npm start`
 
 ### Recent Changes
+- **2025-10-04:** Admin Document Viewer for KYC/Address Verification
+  - Created comprehensive DocumentViewer component to display uploaded verification documents
+  - Integrated document viewer into admin verification management panel
+  - Added "View Documents" button to admin verification table (KYC and Address only)
+  - Displays all uploaded documents:
+    - KYC: ID/passport front image, back image, and selfie
+    - Address: Billing document proof (utility bill, bank statement, etc.)
+  - Shows all extracted verification data with proper Arabic/RTL formatting
+  - Implements proper TypeScript type narrowing for type safety
+  - Production-ready with proper state management and dialog handling
+  - Uses Next.js Image component for optimized document display
+
 - **2025-10-04:** Broker Form Redesign with Modern Best Practices
   - Implemented multi-step wizard architecture with 11 comprehensive steps:
     1. Basic Information (broker details, company info)
