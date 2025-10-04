@@ -52,10 +52,13 @@ export default function LoginPage() {
       description: "Logged in successfully.",
     });
 
-    // Small delay to let auth context update
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // Refresh the router to update server components with new session
+    router.refresh();
 
-    // Default redirect to dashboard - the middleware will handle proper routing
+    // Small delay to let session propagate
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Redirect to dashboard
     router.push('/dashboard');
   }
 
