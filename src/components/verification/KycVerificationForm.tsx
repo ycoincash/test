@@ -84,28 +84,54 @@ export function KycVerificationForm({ onSuccess, onCancel, userCountry }: KycVer
   };
 
   const onSubmit = async (data: KycFormValues) => {
+    console.log('🚀 KYC Form submission started');
+    console.log('📋 Form data:', {
+      documentType: data.documentType,
+      nationality: data.nationality,
+      hasFrontFile: !!data.documentFrontFile,
+      frontFileSize: data.documentFrontFile?.size,
+      frontFileName: data.documentFrontFile?.name,
+      hasBackFile: !!data.documentBackFile,
+      backFileSize: data.documentBackFile?.size,
+      backFileName: data.documentBackFile?.name,
+    });
+    
     setIsSubmitting(true);
     try {
+      console.log('📤 Creating FormData for front document...');
       const frontFormData = new FormData();
       frontFormData.append('file', data.documentFrontFile);
+      
+      console.log('📤 Calling uploadVerificationDocument for front document...');
       const frontResult = await uploadVerificationDocument(frontFormData, 'kyc_front');
+      console.log('📤 Front upload result:', frontResult);
 
       if (!frontResult.success) {
+        console.error('❌ Front upload failed:', frontResult.error);
         throw new Error(frontResult.error || 'فشل رفع الوثيقة الأمامية');
       }
+      
+      console.log('✅ Front upload successful:', frontResult.url);
 
       let backUrl: string | undefined;
       if (data.documentBackFile) {
+        console.log('📤 Creating FormData for back document...');
         const backFormData = new FormData();
         backFormData.append('file', data.documentBackFile);
+        
+        console.log('📤 Calling uploadVerificationDocument for back document...');
         const backResult = await uploadVerificationDocument(backFormData, 'kyc_back');
+        console.log('📤 Back upload result:', backResult);
         
         if (!backResult.success) {
+          console.error('❌ Back upload failed:', backResult.error);
           throw new Error(backResult.error || 'فشل رفع الوثيقة الخلفية');
         }
         backUrl = backResult.url;
+        console.log('✅ Back upload successful:', backUrl);
       }
 
+      console.log('📡 Sending KYC data to API endpoint...');
       const response = await fetch('/api/verification/kyc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -117,13 +143,19 @@ export function KycVerificationForm({ onSuccess, onCancel, userCountry }: KycVer
         }),
       });
 
+      console.log('📡 API response status:', response.status);
+
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ API request failed:', errorText);
         throw new Error('فشل إرسال بيانات التحقق');
       }
 
+      console.log('✅ KYC submission complete!');
       toast({ title: 'نجاح', description: 'تم إرسال معلومات التحقق للمراجعة' });
       onSuccess();
     } catch (error) {
+      console.error('❌ KYC submission error:', error);
       toast({
         variant: 'destructive',
         title: 'خطأ',
@@ -131,6 +163,7 @@ export function KycVerificationForm({ onSuccess, onCancel, userCountry }: KycVer
       });
     } finally {
       setIsSubmitting(false);
+      console.log('🏁 Form submission finished (isSubmitting = false)');
     }
   };
 
