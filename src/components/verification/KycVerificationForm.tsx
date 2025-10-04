@@ -10,7 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Upload, Trash2, Loader2, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { uploadVerificationDocument } from '@/app/actions/upload';
 import { Progress } from '@/components/ui/progress';
 import Image from 'next/image';
 import { countries as allCountries } from '@/lib/countries';
@@ -101,9 +100,14 @@ export function KycVerificationForm({ onSuccess, onCancel, userCountry }: KycVer
       console.log('📤 Creating FormData for front document...');
       const frontFormData = new FormData();
       frontFormData.append('file', data.documentFrontFile);
+      frontFormData.append('documentType', 'kyc_front');
       
-      console.log('📤 Calling uploadVerificationDocument for front document...');
-      const frontResult = await uploadVerificationDocument(frontFormData, 'kyc_front');
+      console.log('📤 Calling upload API for front document...');
+      const frontResponse = await fetch('/api/upload', {
+        method: 'POST',
+        body: frontFormData,
+      });
+      const frontResult = await frontResponse.json();
       console.log('📤 Front upload result:', frontResult);
 
       if (!frontResult.success) {
@@ -118,9 +122,14 @@ export function KycVerificationForm({ onSuccess, onCancel, userCountry }: KycVer
         console.log('📤 Creating FormData for back document...');
         const backFormData = new FormData();
         backFormData.append('file', data.documentBackFile);
+        backFormData.append('documentType', 'kyc_back');
         
-        console.log('📤 Calling uploadVerificationDocument for back document...');
-        const backResult = await uploadVerificationDocument(backFormData, 'kyc_back');
+        console.log('📤 Calling upload API for back document...');
+        const backResponse = await fetch('/api/upload', {
+          method: 'POST',
+          body: backFormData,
+        });
+        const backResult = await backResponse.json();
         console.log('📤 Back upload result:', backResult);
         
         if (!backResult.success) {
