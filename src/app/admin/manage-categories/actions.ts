@@ -1,13 +1,20 @@
-
 "use server";
 
-import { adminDb } from '@/lib/firebase/admin-config';
-import * as admin from 'firebase-admin';
+import { createAdminClient } from '@/lib/supabase/server';
 import type { ProductCategory } from '@/types';
 
 export async function addCategory(data: Omit<ProductCategory, 'id'>) {
     try {
-        await adminDb.collection('productCategories').add(data);
+        const supabase = await createAdminClient();
+        const { error } = await supabase
+            .from('product_categories')
+            .insert(data);
+
+        if (error) {
+            console.error("Error adding category:", error);
+            return { success: false, message: 'فشل إضافة الفئة.' };
+        }
+
         return { success: true, message: 'تمت إضافة الفئة بنجاح.' };
     } catch (error) {
         console.error("Error adding category:", error);
@@ -17,7 +24,17 @@ export async function addCategory(data: Omit<ProductCategory, 'id'>) {
 
 export async function updateCategory(id: string, data: Partial<ProductCategory>) {
     try {
-        await adminDb.collection('productCategories').doc(id).update(data);
+        const supabase = await createAdminClient();
+        const { error } = await supabase
+            .from('product_categories')
+            .update(data)
+            .eq('id', id);
+
+        if (error) {
+            console.error("Error updating category:", error);
+            return { success: false, message: 'فشل تحديث الفئة.' };
+        }
+
         return { success: true, message: 'تم تحديث الفئة بنجاح.' };
     } catch (error) {
         console.error("Error updating category:", error);
@@ -27,7 +44,17 @@ export async function updateCategory(id: string, data: Partial<ProductCategory>)
 
 export async function deleteCategory(id: string) {
     try {
-        await adminDb.collection('productCategories').doc(id).delete();
+        const supabase = await createAdminClient();
+        const { error } = await supabase
+            .from('product_categories')
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            console.error("Error deleting category:", error);
+            return { success: false, message: 'فشل حذف الفئة.' };
+        }
+
         return { success: true, message: 'تم حذف الفئة بنجاح.' };
     } catch (error) {
         console.error("Error deleting category:", error);

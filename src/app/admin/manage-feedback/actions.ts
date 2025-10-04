@@ -1,43 +1,52 @@
-
-
 'use server';
 
-import { adminDb } from '@/lib/firebase/admin-config';
-import * as admin from 'firebase-admin';
-import type { FeedbackForm, FeedbackResponse, EnrichedFeedbackResponse, UserProfile } from '@/types';
+import { createAdminClient } from '@/lib/supabase/server';
+import type { FeedbackForm, FeedbackResponse, EnrichedFeedbackResponse } from '@/types';
 
-
-const safeToDate = (timestamp: any): Date | undefined => {
-    if (timestamp instanceof Date) {
-        return timestamp;
-    }
-    if (timestamp && typeof timestamp.toDate === 'function') {
-        return timestamp.toDate();
-    }
-    return undefined;
-};
-
-
-// Feedback System
 export async function getFeedbackForms(): Promise<FeedbackForm[]> {
-    const snapshot = await adminDb.collection('feedbackForms').orderBy('createdAt', 'desc').get();
-    return snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-            id: doc.id,
-            ...data,
-            createdAt: safeToDate(data.createdAt) || new Date(),
-        } as FeedbackForm;
-    });
+    const supabase = await createAdminClient();
+    const { data, error } = await supabase
+        .from('feedback_forms')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        console.error("Error fetching feedback forms:", error);
+        return [];
+    }
+
+    return data.map(form => ({
+        id: form.id,
+        title: form.title,
+        description: form.description,
+        status: form.is_active ? 'active' : 'inactive',
+        questions: form.questions,
+        createdAt: new Date(form.created_at),
+        responseCount: form.response_count,
+    })) as FeedbackForm[];
 }
 
 export async function addFeedbackForm(data: Omit<FeedbackForm, 'id' | 'createdAt' | 'responseCount'>) {
     try {
-        await adminDb.collection('feedbackForms').add( {
-            ...data,
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            responseCount: 0,
-        });
+        const supabase = await createAdminClient();
+        const now = new Date().toISOString();
+        
+        const { error } = await supabase
+            .from('feedback_forms')
+            .insert({
+                title: data.title,
+                description: data.description,
+                is_active: data.status === 'active',
+                questions: data.questions,
+                created_at: now,
+                response_count: 0,
+            });
+
+        if (error) {
+            console.error("Error adding feedback form:", error);
+            return { success: false, message: 'فشل إنشاء النموذج.' };
+        }
+
         return { success: true, message: 'تم إنشاء نموذج الملاحظات بنجاح.' };
     } catch (error) {
         console.error("Error adding feedback form:", error);
@@ -47,7 +56,25 @@ export async function addFeedbackForm(data: Omit<FeedbackForm, 'id' | 'createdAt
 
 export async function updateFeedbackForm(id: string, data: Partial<Omit<FeedbackForm, 'id' | 'createdAt'>>) {
     try {
-        await adminDb.collection('feedbackForms').doc(id).update( data);
+        const supabase = await createAdminClient();
+        
+        const updateData: any = {};
+        if (data.title !== undefined) updateData.title = data.title;
+        if (data.description !== undefined) updateData.description = data.description;
+        if (data.status !== undefined) updateData.is_active = data.status === 'active';
+        if (data.questions !== undefined) updateData.questions = data.questions;
+        if (data.responseCount !== undefined) updateData.response_count = data.responseCount;
+
+        const { error } = await supabase
+            .from('feedback_forms')
+            .update(updateData)
+            .eq('id', id);
+
+        if (error) {
+            console.error("Error updating feedback form:", error);
+            return { success: false, message: 'فشل تحديث النموذج.' };
+        }
+
         return { success: true, message: 'تم تحديث النموذج بنجاح.' };
     } catch (error) {
         console.error("Error updating feedback form:", error);
@@ -57,7 +84,17 @@ export async function updateFeedbackForm(id: string, data: Partial<Omit<Feedback
 
 export async function deleteFeedbackForm(id: string) {
     try {
-        await adminDb.collection('feedbackForms').doc(id).delete();
+        const supabase = await createAdminClient();
+        const { error } = await supabase
+            .from('feedback_forms')
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            console.error("Error deleting feedback form:", error);
+            return { success: false, message: 'فشل حذف النموذج.' };
+        }
+
         return { success: true, message: 'تم حذف النموذج بنجاح.' };
     } catch (error) {
         console.error("Error deleting feedback form:", error);
@@ -66,45 +103,54 @@ export async function deleteFeedbackForm(id: string) {
 }
 
 export async function getFeedbackFormById(formId: string): Promise<FeedbackForm | null> {
-    const docRef = adminDb.collection('feedbackForms').doc(formId);
-    const docSnap = await docRef.get();
-    if (!docSnap.exists) {
+    const supabase = await createAdminClient();
+    const { data, error } = await supabase
+        .from('feedback_forms')
+        .select('*')
+        .eq('id', formId)
+        .single();
+
+    if (error || !data) {
+        console.error("Error fetching feedback form:", error);
         return null;
     }
-    const data = docSnap.data();
+
     return {
-        id: docSnap.id,
-        ...data,
-        createdAt: safeToDate(data.createdAt) || new Date(),
+        id: data.id,
+        title: data.title,
+        description: data.description,
+        status: data.is_active ? 'active' : 'inactive',
+        questions: data.questions,
+        createdAt: new Date(data.created_at),
+        responseCount: data.response_count,
     } as FeedbackForm;
 }
 
 export async function getFeedbackResponses(formId: string): Promise<EnrichedFeedbackResponse[]> {
-    // Query without ordering to avoid needing a composite index
-    const responsesQuery = adminDb.collection('feedbackResponses').where('formId', '==', formId);
-    const responsesSnap = await responsesQuery.get();
+    const supabase = await createAdminClient();
+    
+    const { data: responses, error } = await supabase
+        .from('feedback_responses')
+        .select(`
+            *,
+            users (
+                name
+            )
+        `)
+        .eq('form_id', formId)
+        .order('submitted_at', { ascending: false });
 
-    const responses = responsesSnap.docs.map(doc => {
-        const data = doc.data();
-        return {
-            id: doc.id,
-            ...data,
-            submittedAt: safeToDate(data.submittedAt) || new Date(),
-        } as FeedbackResponse;
-    });
-
-    // Sort in-memory instead of in the query
-    responses.sort((a, b) => b.submittedAt.getTime() - a.submittedAt.getTime());
-
-    const userIds = [...new Set(responses.map(r => r.userId))];
-    if (userIds.length === 0) return [];
-
-    const usersQuery = adminDb.collection('users').where(admin.firestore.FieldPath.documentId(), 'in', userIds);
-    const usersSnap = await usersQuery.get();
-    const usersMap = new Map(usersSnap.docs.map(d => [d.id, d.data() as UserProfile]));
+    if (error) {
+        console.error("Error fetching feedback responses:", error);
+        return [];
+    }
 
     return responses.map(response => ({
-        ...response,
-        userName: usersMap.get(response.userId)?.name || 'مستخدم غير معروف'
-    }));
+        id: response.id,
+        formId: response.form_id,
+        userId: response.user_id,
+        answers: response.responses,
+        submittedAt: new Date(response.submitted_at),
+        userName: response.users?.name || 'مستخدم غير معروف'
+    })) as EnrichedFeedbackResponse[];
 }

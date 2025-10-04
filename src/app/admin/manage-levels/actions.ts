@@ -1,21 +1,25 @@
-
 'use server';
 
-import { adminDb } from '@/lib/firebase/admin-config';
-import * as admin from 'firebase-admin';
+import { createAdminClient } from '@/lib/supabase/server';
 import type { ClientLevel } from '@/types';
-
 
 export async function updateClientLevels(levels: ClientLevel[]) {
     try {
-        const batch = adminDb.batch();
-        levels.forEach(level => {
-            const levelRef = adminDb.collection('clientLevels').doc(String(level.id));
-            // The 'id' is the document ID, so we don't need to save it inside the document.
+        const supabase = await createAdminClient();
+        
+        for (const level of levels) {
             const { id, ...levelData } = level;
-            batch.set(levelRef, levelData);
-        });
-        await batch.commit();
+            const { error } = await supabase
+                .from('client_levels')
+                .update(levelData)
+                .eq('id', id);
+
+            if (error) {
+                console.error(`Error updating client level ${id}:`, error);
+                return { success: false, message: 'فشل تحديث مستويات العملاء.' };
+            }
+        }
+
         return { success: true, message: 'تم تحديث مستويات العملاء بنجاح.' };
     } catch (error) {
         console.error("Error updating client levels:", error);
@@ -24,9 +28,19 @@ export async function updateClientLevels(levels: ClientLevel[]) {
 }
 
 export async function seedClientLevels(): Promise<{ success: boolean; message: string; }> {
-    const levelsCollection = adminDb.collection('clientLevels');
-    const snapshot = await levelsCollection.get();
-    if (!snapshot.empty) {
+    const supabase = await createAdminClient();
+    
+    const { data: existingLevels, error: fetchError } = await supabase
+        .from('client_levels')
+        .select('id')
+        .limit(1);
+
+    if (fetchError) {
+        console.error("Error checking client levels:", fetchError);
+        return { success: false, message: 'فشل التحقق من مستويات العملاء.' };
+    }
+
+    if (existingLevels && existingLevels.length > 0) {
         return { success: false, message: 'مستويات العملاء موجودة بالفعل.' };
     }
 
@@ -40,13 +54,20 @@ export async function seedClientLevels(): Promise<{ success: boolean; message: s
     ];
 
     try {
-        const batch = adminDb.batch();
-        defaultLevels.forEach((level, index) => {
-            const levelId = String(index + 1);
-            const docRef = adminDb.collection('clientLevels').doc(levelId);
-            batch.set(docRef, level);
-        });
-        await batch.commit();
+        const levelsToInsert = defaultLevels.map((level, index) => ({
+            id: index + 1,
+            ...level
+        }));
+
+        const { error } = await supabase
+            .from('client_levels')
+            .insert(levelsToInsert);
+
+        if (error) {
+            console.error("Error seeding client levels:", error);
+            return { success: false, message: 'فشل إضافة مستويات العملاء الافتراضية.' };
+        }
+
         return { success: true, message: 'تمت إضافة مستويات العملاء الافتراضية بنجاح.' };
     } catch (error) {
         console.error("Error seeding client levels:", error);

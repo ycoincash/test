@@ -1,28 +1,14 @@
 'use server';
 
-import { adminDb } from '@/lib/firebase/admin-config';
-import * as admin from 'firebase-admin';
-import { startOfMonth } from 'date-fns';
+import { createAdminClient } from '@/lib/supabase/server';
 import type { ActivityLog, BannerSettings, BlogPost, Broker, CashbackTransaction, DeviceInfo, Notification, Order, PaymentMethod, ProductCategory, Product, TradingAccount, UserProfile, Withdrawal, GeoInfo, ClientLevel, AdminNotification, Offer } from '@/types';
 import { getClientLevels } from '@/app/actions';
 
 // ====================================================================
-// SECURITY: Admin operations use Firebase Admin SDK which bypasses
-// Firestore Security Rules. All functions in this file should only be
+// SECURITY: Admin operations use Supabase Service Role Key which bypasses
+// Row Level Security. All functions in this file should only be
 // called from admin-authenticated contexts.
 // ====================================================================
-
-const safeToDate = (timestamp: any): Date | undefined => {
-  if (!timestamp) return undefined;
-  if (timestamp instanceof Date) return timestamp;
-  if (timestamp?._seconds) {
-    return new Date(timestamp._seconds * 1000);
-  }
-  if (typeof timestamp?.toDate === 'function') {
-    return timestamp.toDate();
-  }
-  return undefined;
-};
 
 // Activity Logging
 export async function logUserActivity(
@@ -32,12 +18,14 @@ export async function logUserActivity(
   details?: Record<string, any>
 ) {
   try {
-    const logEntry: Omit<ActivityLog, 'id'> = {
-      userId,
+    const supabase = await createAdminClient();
+    
+    const logEntry = {
+      user_id: userId,
       event,
-      timestamp: new Date(),
-      ipAddress: clientInfo.geoInfo.ip || 'unknown',
-      userAgent: `${clientInfo.deviceInfo.browser} on ${clientInfo.deviceInfo.os}`,
+      timestamp: new Date().toISOString(),
+      ip_address: clientInfo.geoInfo.ip || 'unknown',
+      user_agent: `${clientInfo.deviceInfo.browser} on ${clientInfo.deviceInfo.os}`,
       device: clientInfo.deviceInfo,
       geo: {
         country: clientInfo.geoInfo.country || 'Unknown',
@@ -45,64 +33,86 @@ export async function logUserActivity(
       },
       details,
     };
-    await adminDb.collection('activityLogs').add(logEntry);
+    
+    const { error } = await supabase
+      .from('activity_logs')
+      .insert(logEntry);
+    
+    if (error) throw error;
   } catch (error) {
     console.error(`Failed to log activity for event ${event}:`, error);
   }
 }
 
 export async function getActivityLogs(): Promise<ActivityLog[]> {
-  const snapshot = await adminDb
-    .collection('activityLogs')
-    .orderBy('timestamp', 'desc')
-    .get();
+  const supabase = await createAdminClient();
+  
+  const { data, error } = await supabase
+    .from('activity_logs')
+    .select('*')
+    .order('timestamp', { ascending: false });
 
-  return snapshot.docs.map((doc) => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      ...data,
-      timestamp: safeToDate(data.timestamp) || new Date(),
-    } as ActivityLog;
-  });
+  if (error) {
+    console.error('Error fetching activity logs:', error);
+    return [];
+  }
+
+  return (data || []).map((log) => ({
+    id: log.id,
+    userId: log.user_id,
+    event: log.event,
+    timestamp: new Date(log.timestamp),
+    ipAddress: log.ip_address,
+    userAgent: log.user_agent,
+    device: log.device,
+    geo: log.geo,
+    details: log.details,
+  }));
 }
 
 // Generic function to create a notification
-export async function createNotification(
-  transaction: admin.firestore.Transaction,
+async function createNotificationDirect(
   userId: string,
   message: string,
   type: Notification['type'],
   link?: string
 ) {
-  const newNotifRef = adminDb.collection('notifications').doc();
-  transaction.set(newNotifRef, {
-    userId,
-    message,
-    type,
-    link,
-    isRead: false,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
+  const supabase = await createAdminClient();
+  
+  const { error } = await supabase
+    .from('notifications')
+    .insert({
+      user_id: userId,
+      message,
+      type,
+      link,
+      is_read: false,
+      created_at: new Date().toISOString(),
+    });
+  
+  if (error) {
+    console.error('Error creating notification:', error);
+  }
 }
 
 // Balance Calculation
 export async function getUserBalance(userId: string) {
-  const [transactionsSnap, withdrawalsSnap, ordersSnap] = await Promise.all([
-    adminDb.collection('cashbackTransactions').where('userId', '==', userId).get(),
-    adminDb.collection('withdrawals').where('userId', '==', userId).get(),
-    adminDb.collection('orders').where('userId', '==', userId).get(),
+  const supabase = await createAdminClient();
+  
+  const [transactionsResult, withdrawalsResult, ordersResult] = await Promise.all([
+    supabase.from('cashback_transactions').select('cashback_amount').eq('user_id', userId),
+    supabase.from('withdrawals').select('amount, status').eq('user_id', userId),
+    supabase.from('orders').select('total_price, status').eq('user_id', userId),
   ]);
 
-  const totalEarned = transactionsSnap.docs.reduce(
-    (sum, doc) => sum + (doc.data().cashbackAmount || 0),
+  const totalEarned = (transactionsResult.data || []).reduce(
+    (sum, tx) => sum + (tx.cashback_amount || 0),
     0
   );
 
   let pendingWithdrawals = 0;
   let completedWithdrawals = 0;
-  withdrawalsSnap.docs.forEach((doc) => {
-    const withdrawal = doc.data() as Withdrawal;
+  (withdrawalsResult.data || []).forEach((withdrawal) => {
     if (withdrawal.status === 'Processing') {
       pendingWithdrawals += withdrawal.amount;
     } else if (withdrawal.status === 'Completed') {
@@ -110,9 +120,9 @@ export async function getUserBalance(userId: string) {
     }
   });
 
-  const totalSpentOnOrders = ordersSnap.docs
-    .filter((doc) => doc.data().status !== 'Cancelled')
-    .reduce((sum, doc) => sum + (doc.data().price || 0), 0);
+  const totalSpentOnOrders = (ordersResult.data || [])
+    .filter((order) => order.status !== 'Cancelled')
+    .reduce((sum, order) => sum + (order.total_price || 0), 0);
 
   const availableBalance =
     totalEarned - completedWithdrawals - pendingWithdrawals - totalSpentOnOrders;
@@ -133,156 +143,199 @@ export async function awardReferralCommission(
   amountValue: number
 ) {
   try {
-    await adminDb.runTransaction(async (transaction) => {
-      const userRef = adminDb.collection('users').doc(userId);
-      const userSnap = await transaction.get(userRef);
+    const supabase = await createAdminClient();
+    
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id, name, referred_by')
+      .eq('id', userId)
+      .single();
 
-      if (!userSnap.exists || !userSnap.data()?.referredBy) {
-        console.log(`User ${userId} has no referrer. Skipping commission.`);
-        return;
-      }
-      if (amountValue <= 0) {
-        console.log(
-          `Commission source amount is zero or negative for user ${userId}. Skipping.`
-        );
-        return;
-      }
-
-      const referrerId = userSnap.data()!.referredBy;
-      const referrerRef = adminDb.collection('users').doc(referrerId);
-      const referrerSnap = await transaction.get(referrerRef);
-
-      if (!referrerSnap.exists) {
-        console.log(`Referrer ${referrerId} does not exist. Skipping commission.`);
-        return;
-      }
-
-      const referrerLevel = referrerSnap.data()?.level || 1;
-      const levels = await getClientLevels();
-      const currentLevelConfig = levels.find((l) => l.id === referrerLevel);
-
-      if (!currentLevelConfig) {
-        console.log(`Level config not found for level ${referrerLevel}. Skipping commission.`);
-        return;
-      }
-
-      const commissionPercent =
-        sourceType === 'cashback'
-          ? currentLevelConfig.advantage_referral_cashback
-          : currentLevelConfig.advantage_referral_store;
-
-      if (commissionPercent <= 0) {
-        console.log(`No commission for level ${referrerLevel} and source ${sourceType}. Skipping.`);
-        return;
-      }
-
-      const commissionAmount = (amountValue * commissionPercent) / 100;
-      const newTransactionRef = adminDb.collection('cashbackTransactions').doc();
-
-      transaction.set(newTransactionRef, {
-        userId: referrerId,
-        accountId: 'REFERRAL_COMMISSION',
-        accountNumber: 'Referral',
-        broker: `Commission from ${userSnap.data()!.name}`,
-        date: admin.firestore.FieldValue.serverTimestamp(),
-        tradeDetails: `Referral commission from ${sourceType}`,
-        cashbackAmount: commissionAmount,
-        sourceUserId: userId,
-        sourceType: sourceType,
-      });
-
-      transaction.update(referrerRef, {
-        monthlyEarnings: admin.firestore.FieldValue.increment(commissionAmount),
-      });
-
-      const message = `لقد ربحت ${commissionAmount.toFixed(2)}$ عمولة إحالة من ${
-        userSnap.data()!.name
-      }.`;
-      await createNotification(
-        transaction,
-        referrerId,
-        message,
-        'general',
-        '/dashboard/referrals'
+    if (userError || !user || !user.referred_by) {
+      console.log(`User ${userId} has no referrer. Skipping commission.`);
+      return;
+    }
+    
+    if (amountValue <= 0) {
+      console.log(
+        `Commission source amount is zero or negative for user ${userId}. Skipping.`
       );
-    });
+      return;
+    }
+
+    const referrerId = user.referred_by;
+    const { data: referrer, error: referrerError } = await supabase
+      .from('users')
+      .select('id, level, monthly_earnings')
+      .eq('id', referrerId)
+      .single();
+
+    if (referrerError || !referrer) {
+      console.log(`Referrer ${referrerId} does not exist. Skipping commission.`);
+      return;
+    }
+
+    const referrerLevel = referrer.level || 1;
+    const levels = await getClientLevels();
+    const currentLevelConfig = levels.find((l) => l.id === referrerLevel);
+
+    if (!currentLevelConfig) {
+      console.log(`Level config not found for level ${referrerLevel}. Skipping commission.`);
+      return;
+    }
+
+    const commissionPercent =
+      sourceType === 'cashback'
+        ? currentLevelConfig.advantage_referral_cashback
+        : currentLevelConfig.advantage_referral_store;
+
+    if (commissionPercent <= 0) {
+      console.log(`No commission for level ${referrerLevel} and source ${sourceType}. Skipping.`);
+      return;
+    }
+
+    const commissionAmount = (amountValue * commissionPercent) / 100;
+
+    const { error: txError } = await supabase
+      .from('cashback_transactions')
+      .insert({
+        user_id: referrerId,
+        account_id: null,
+        account_number: 'Referral',
+        broker: `Commission from ${user.name}`,
+        date: new Date().toISOString(),
+        trade_details: `Referral commission from ${sourceType}`,
+        cashback_amount: commissionAmount,
+        source_user_id: userId,
+        source_type: sourceType,
+      });
+
+    if (txError) {
+      console.error('Error creating commission transaction:', txError);
+      return;
+    }
+
+    const newMonthlyEarnings = (referrer.monthly_earnings || 0) + commissionAmount;
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({ monthly_earnings: newMonthlyEarnings })
+      .eq('id', referrerId);
+
+    if (updateError) {
+      console.error('Error updating monthly earnings:', updateError);
+    }
+
+    const message = `لقد ربحت ${commissionAmount.toFixed(2)}$ عمولة إحالة من ${user.name}.`;
+    await createNotificationDirect(
+      referrerId,
+      message,
+      'general',
+      '/dashboard/referrals'
+    );
   } catch (error) {
     console.error(`Failed to award referral commission to user ${userId}'s referrer:`, error);
   }
 }
 
 export async function clawbackReferralCommission(
-  transaction: admin.firestore.Transaction,
   originalUserId: string,
   sourceType: 'cashback' | 'store_purchase',
   originalAmount: number
 ) {
-  const userRef = adminDb.collection('users').doc(originalUserId);
-  const userSnap = await transaction.get(userRef);
+  try {
+    const supabase = await createAdminClient();
+    
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id, name, referred_by')
+      .eq('id', originalUserId)
+      .single();
 
-  if (!userSnap.exists || !userSnap.data()?.referredBy) {
-    return;
+    if (userError || !user || !user.referred_by) {
+      return;
+    }
+
+    const referrerId = user.referred_by;
+    const { data: referrer, error: referrerError } = await supabase
+      .from('users')
+      .select('id, level, monthly_earnings')
+      .eq('id', referrerId)
+      .single();
+
+    if (referrerError || !referrer) return;
+
+    const referrerLevel = referrer.level || 1;
+    const levels = await getClientLevels();
+    const currentLevelConfig = levels.find((l) => l.id === referrerLevel);
+
+    if (!currentLevelConfig) return;
+
+    const commissionPercent =
+      sourceType === 'cashback'
+        ? currentLevelConfig.advantage_referral_cashback
+        : currentLevelConfig.advantage_referral_store;
+
+    if (commissionPercent <= 0) return;
+
+    const commissionAmountToClawback = (originalAmount * commissionPercent) / 100;
+
+    const { error: txError } = await supabase
+      .from('cashback_transactions')
+      .insert({
+        user_id: referrerId,
+        account_id: null,
+        account_number: 'Clawback',
+        broker: `Reversed Commission from ${user.name}`,
+        date: new Date().toISOString(),
+        trade_details: `Commission reversed due to cancelled order/transaction from original user.`,
+        cashback_amount: -commissionAmountToClawback,
+        source_user_id: originalUserId,
+        source_type: sourceType,
+      });
+
+    if (txError) {
+      console.error('Error creating clawback transaction:', txError);
+      return;
+    }
+
+    const newMonthlyEarnings = (referrer.monthly_earnings || 0) - commissionAmountToClawback;
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({ monthly_earnings: newMonthlyEarnings })
+      .eq('id', referrerId);
+
+    if (updateError) {
+      console.error('Error updating monthly earnings:', updateError);
+    }
+
+    const message = `تم خصم ${commissionAmountToClawback.toFixed(2)}$ من رصيدك بسبب إلغاء معاملة من قبل ${user.name}.`;
+    await createNotificationDirect(referrerId, message, 'general', '/dashboard/referrals');
+  } catch (error) {
+    console.error('Error in clawbackReferralCommission:', error);
   }
-
-  const referrerId = userSnap.data()!.referredBy;
-  const referrerRef = adminDb.collection('users').doc(referrerId);
-  const referrerSnap = await transaction.get(referrerRef);
-
-  if (!referrerSnap.exists) return;
-
-  const referrerLevel = referrerSnap.data()?.level || 1;
-  const levels = await getClientLevels();
-  const currentLevelConfig = levels.find((l) => l.id === referrerLevel);
-
-  if (!currentLevelConfig) return;
-
-  const commissionPercent =
-    sourceType === 'cashback'
-      ? currentLevelConfig.advantage_referral_cashback
-      : currentLevelConfig.advantage_referral_store;
-
-  if (commissionPercent <= 0) return;
-
-  const commissionAmountToClawback = (originalAmount * commissionPercent) / 100;
-  const newTransactionRef = adminDb.collection('cashbackTransactions').doc();
-
-  transaction.set(newTransactionRef, {
-    userId: referrerId,
-    accountId: 'CLAWBACK',
-    accountNumber: 'Clawback',
-    broker: `Reversed Commission from ${userSnap.data()!.name}`,
-    date: admin.firestore.FieldValue.serverTimestamp(),
-    tradeDetails: `Commission reversed due to cancelled order/transaction from original user.`,
-    cashbackAmount: -commissionAmountToClawback,
-    sourceUserId: originalUserId,
-    sourceType: sourceType,
-  });
-
-  transaction.update(referrerRef, {
-    monthlyEarnings: admin.firestore.FieldValue.increment(-commissionAmountToClawback),
-  });
-
-  const message = `تم خصم ${commissionAmountToClawback.toFixed(2)}$ من رصيدك بسبب إلغاء معاملة من قبل ${
-    userSnap.data()!.name
-  }.`;
-  await createNotification(transaction, referrerId, message, 'general', '/dashboard/referrals');
 }
 
 // Admin Notifications
 export async function getAdminNotifications(): Promise<AdminNotification[]> {
-  const snapshot = await adminDb
-    .collection('adminNotifications')
-    .orderBy('createdAt', 'desc')
-    .get();
+  const supabase = await createAdminClient();
+  
+  const { data, error } = await supabase
+    .from('admin_notifications')
+    .select('*')
+    .order('created_at', { ascending: false });
 
-  return snapshot.docs.map((doc) => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      ...data,
-      createdAt: safeToDate(data.createdAt) || new Date(),
-    } as AdminNotification;
-  });
+  if (error) {
+    console.error('Error fetching admin notifications:', error);
+    return [];
+  }
+
+  return (data || []).map((notif) => ({
+    id: notif.id,
+    message: notif.message,
+    target: notif.target,
+    userIds: notif.user_ids || [],
+    createdAt: new Date(notif.created_at),
+  }));
 }
 
 export async function sendAdminNotification(
@@ -291,41 +344,61 @@ export async function sendAdminNotification(
   userIds: string[]
 ): Promise<{ success: boolean; message: string }> {
   try {
-    const adminNotifRef = adminDb.collection('adminNotifications').doc();
-    await adminNotifRef.set({
-      message,
-      target,
-      userIds,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    const supabase = await createAdminClient();
+    
+    const { error: adminNotifError } = await supabase
+      .from('admin_notifications')
+      .insert({
+        message,
+        target,
+        user_ids: userIds,
+        created_at: new Date().toISOString(),
+      });
 
-    let targetUsers: { id: string }[] = [];
-
-    if (target === 'all') {
-      const usersSnapshot = await adminDb.collection('users').get();
-      targetUsers = usersSnapshot.docs.map((doc) => ({ id: doc.id }));
-    } else {
-      targetUsers = userIds.map((id) => ({ id }));
+    if (adminNotifError) {
+      console.error('Error creating admin notification:', adminNotifError);
+      return { success: false, message: 'فشل إرسال الإشعار.' };
     }
 
-    if (targetUsers.length === 0) {
+    let targetUserIds: string[] = [];
+
+    if (target === 'all') {
+      const { data: users, error: usersError } = await supabase
+        .from('users')
+        .select('id');
+      
+      if (usersError) {
+        console.error('Error fetching users:', usersError);
+        return { success: false, message: 'فشل جلب المستخدمين.' };
+      }
+      
+      targetUserIds = (users || []).map((u) => u.id);
+    } else {
+      targetUserIds = userIds;
+    }
+
+    if (targetUserIds.length === 0) {
       return { success: false, message: 'لم يتم تحديد مستخدمين مستهدفين.' };
     }
 
-    await adminDb.runTransaction(async (transaction) => {
-      targetUsers.forEach((user) => {
-        const userNotifRef = adminDb.collection('notifications').doc();
-        transaction.set(userNotifRef, {
-          userId: user.id,
-          message,
-          type: 'announcement',
-          isRead: false,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-      });
-    });
+    const notifications = targetUserIds.map((userId) => ({
+      user_id: userId,
+      message,
+      type: 'announcement' as const,
+      is_read: false,
+      created_at: new Date().toISOString(),
+    }));
 
-    return { success: true, message: `تم إرسال الإشعار إلى ${targetUsers.length} مستخدم.` };
+    const { error: notifsError } = await supabase
+      .from('notifications')
+      .insert(notifications);
+
+    if (notifsError) {
+      console.error('Error creating user notifications:', notifsError);
+      return { success: false, message: 'فشل إنشاء الإشعارات للمستخدمين.' };
+    }
+
+    return { success: true, message: `تم إرسال الإشعار إلى ${targetUserIds.length} مستخدم.` };
   } catch (error) {
     console.error('Error sending admin notification:', error);
     return { success: false, message: 'فشل إرسال الإشعار.' };
@@ -333,29 +406,65 @@ export async function sendAdminNotification(
 }
 
 export async function getBannerSettings(): Promise<BannerSettings> {
-  const docSnap = await adminDb.collection('settings').doc('banner').get();
+  const supabase = await createAdminClient();
+  
+  const { data, error } = await supabase
+    .from('banner_settings')
+    .select('*')
+    .eq('id', 'banner')
+    .single();
 
-  if (docSnap.exists) {
-    return docSnap.data() as BannerSettings;
+  if (error || !data) {
+    return {
+      isEnabled: false,
+      type: 'text',
+      title: '',
+      text: '',
+      ctaText: '',
+      ctaLink: '',
+      scriptCode: '',
+      targetLevels: [],
+      targetCountries: [],
+      targetStatuses: [],
+    };
   }
 
   return {
-    isEnabled: false,
-    type: 'text',
-    title: '',
-    text: '',
-    ctaText: '',
-    ctaLink: '',
-    scriptCode: '',
-    targetTiers: [],
-    targetCountries: [],
-    targetStatuses: [],
+    isEnabled: data.is_enabled || false,
+    type: data.type || 'text',
+    title: data.title || '',
+    text: data.text || '',
+    ctaText: data.cta_text || '',
+    ctaLink: data.cta_link || '',
+    scriptCode: data.script_code || '',
+    targetLevels: data.target_levels || [],
+    targetCountries: data.target_countries || [],
+    targetStatuses: data.target_statuses || [],
   };
 }
 
 export async function updateBannerSettings(settings: BannerSettings) {
   try {
-    await adminDb.collection('settings').doc('banner').set(settings, { merge: true });
+    const supabase = await createAdminClient();
+    
+    const { error } = await supabase
+      .from('banner_settings')
+      .update({
+        is_enabled: settings.isEnabled,
+        type: settings.type,
+        title: settings.title,
+        text: settings.text,
+        cta_text: settings.ctaText,
+        cta_link: settings.ctaLink,
+        script_code: settings.scriptCode,
+        target_levels: settings.targetLevels,
+        target_countries: settings.targetCountries,
+        target_statuses: settings.targetStatuses,
+      })
+      .eq('id', 'banner');
+
+    if (error) throw error;
+    
     return { success: true, message: 'تم تحديث إعدادات البانر بنجاح.' };
   } catch (error) {
     console.error('Error updating banner settings:', error);

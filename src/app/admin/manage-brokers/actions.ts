@@ -1,22 +1,51 @@
 'use server';
 
-import { adminDb } from '@/lib/firebase/admin-config';
-import * as admin from 'firebase-admin';
+import { createAdminClient } from '@/lib/supabase/server';
 import type { Broker } from '@/types';
 
 export async function getBrokers(): Promise<Broker[]> {
-  const brokersSnapshot = await adminDb.collection('brokers').orderBy('order').get();
-  return brokersSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Broker));
+  const supabase = await createAdminClient();
+  const { data, error } = await supabase
+    .from('brokers')
+    .select('*')
+    .order('order');
+
+  if (error) {
+    console.error('Error fetching brokers:', error);
+    return [];
+  }
+
+  return data as Broker[];
 }
 
 export async function addBroker(data: Omit<Broker, 'id' | 'order'>) {
   try {
-    const brokersSnapshot = await adminDb.collection('brokers').orderBy('order', 'desc').get();
-    const maxOrder =
-      brokersSnapshot.docs.length > 0 && brokersSnapshot.docs[0].data().order != null
-        ? brokersSnapshot.docs[0].data().order
-        : -1;
-    await adminDb.collection('brokers').add({ ...data, order: maxOrder + 1 });
+    const supabase = await createAdminClient();
+    
+    const { data: brokersData, error: fetchError } = await supabase
+      .from('brokers')
+      .select('order')
+      .order('order', { ascending: false })
+      .limit(1);
+
+    if (fetchError) {
+      console.error('Error fetching max order:', fetchError);
+      return { success: false, message: 'فشل إضافة الوسيط.' };
+    }
+
+    const maxOrder = brokersData && brokersData.length > 0 && brokersData[0].order != null
+      ? brokersData[0].order
+      : -1;
+
+    const { error } = await supabase
+      .from('brokers')
+      .insert({ ...data, order: maxOrder + 1 });
+
+    if (error) {
+      console.error('Error adding broker:', error);
+      return { success: false, message: 'فشل إضافة الوسيط.' };
+    }
+
     return { success: true, message: 'تمت إضافة الوسيط بنجاح.' };
   } catch (error) {
     console.error('Error adding broker:', error);
@@ -26,7 +55,17 @@ export async function addBroker(data: Omit<Broker, 'id' | 'order'>) {
 
 export async function updateBroker(brokerId: string, data: Partial<Omit<Broker, 'id'>>) {
   try {
-    await adminDb.collection('brokers').doc(brokerId).update(data);
+    const supabase = await createAdminClient();
+    const { error } = await supabase
+      .from('brokers')
+      .update(data)
+      .eq('id', brokerId);
+
+    if (error) {
+      console.error('Error updating broker:', error);
+      return { success: false, message: 'فشل تحديث الوسيط.' };
+    }
+
     return { success: true, message: 'تم تحديث الوسيط بنجاح.' };
   } catch (error) {
     console.error('Error updating broker:', error);
@@ -36,7 +75,17 @@ export async function updateBroker(brokerId: string, data: Partial<Omit<Broker, 
 
 export async function deleteBroker(brokerId: string) {
   try {
-    await adminDb.collection('brokers').doc(brokerId).delete();
+    const supabase = await createAdminClient();
+    const { error } = await supabase
+      .from('brokers')
+      .delete()
+      .eq('id', brokerId);
+
+    if (error) {
+      console.error('Error deleting broker:', error);
+      return { success: false, message: 'فشل حذف الوسيط.' };
+    }
+
     return { success: true, message: 'تم حذف الوسيط بنجاح.' };
   } catch (error) {
     console.error('Error deleting broker:', error);
@@ -46,12 +95,20 @@ export async function deleteBroker(brokerId: string) {
 
 export async function updateBrokerOrder(orderedIds: string[]) {
   try {
-    const batch = adminDb.batch();
-    orderedIds.forEach((id, index) => {
-      const docRef = adminDb.collection('brokers').doc(id);
-      batch.update(docRef, { order: index });
-    });
-    await batch.commit();
+    const supabase = await createAdminClient();
+    
+    for (let index = 0; index < orderedIds.length; index++) {
+      const { error } = await supabase
+        .from('brokers')
+        .update({ order: index })
+        .eq('id', orderedIds[index]);
+
+      if (error) {
+        console.error('Error updating broker order:', error);
+        return { success: false, message: 'فشل تحديث ترتيب الوسطاء.' };
+      }
+    }
+
     return { success: true, message: 'تم تحديث ترتيب الوسطاء.' };
   } catch (error) {
     console.error('Error updating broker order:', error);
@@ -61,21 +118,37 @@ export async function updateBrokerOrder(orderedIds: string[]) {
 
 export async function addBrokersBatch(brokers: Omit<Broker, 'id' | 'order'>[]) {
   try {
-    const batch = adminDb.batch();
-    const brokersCollection = adminDb.collection('brokers');
-    const brokersSnapshot = await brokersCollection.orderBy('order', 'desc').get();
-    let maxOrder =
-      brokersSnapshot.docs.length > 0 && brokersSnapshot.docs[0].data().order != null
-        ? brokersSnapshot.docs[0].data().order
-        : -1;
+    const supabase = await createAdminClient();
+    
+    const { data: brokersData, error: fetchError } = await supabase
+      .from('brokers')
+      .select('order')
+      .order('order', { ascending: false })
+      .limit(1);
 
-    brokers.forEach((brokerData) => {
-      const newBrokerRef = brokersCollection.doc();
+    if (fetchError) {
+      console.error('Error fetching max order:', fetchError);
+      return { success: false, message: 'فشل إضافة الوسطاء.' };
+    }
+
+    let maxOrder = brokersData && brokersData.length > 0 && brokersData[0].order != null
+      ? brokersData[0].order
+      : -1;
+
+    const brokersToInsert = brokers.map((brokerData) => {
       maxOrder++;
-      batch.set(newBrokerRef, { ...brokerData, order: maxOrder });
+      return { ...brokerData, order: maxOrder };
     });
 
-    await batch.commit();
+    const { error } = await supabase
+      .from('brokers')
+      .insert(brokersToInsert);
+
+    if (error) {
+      console.error('Error adding brokers batch:', error);
+      return { success: false, message: 'فشل إضافة الوسطاء.' };
+    }
+
     return { success: true, message: `تمت إضافة ${brokers.length} وسطاء بنجاح.` };
   } catch (error) {
     console.error('Error adding brokers batch:', error);

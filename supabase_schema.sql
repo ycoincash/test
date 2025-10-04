@@ -245,14 +245,17 @@ CREATE TABLE blog_posts (
     slug TEXT UNIQUE NOT NULL,
     content TEXT NOT NULL,
     excerpt TEXT,
-    author TEXT NOT NULL,
-    is_published BOOLEAN DEFAULT FALSE,
+    image_url TEXT,
+    author_name TEXT NOT NULL,
+    author_id TEXT NOT NULL,
+    status TEXT DEFAULT 'draft' CHECK (status IN ('draft', 'published')),
+    tags TEXT[] DEFAULT ARRAY[]::TEXT[],
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX idx_blog_posts_slug ON blog_posts(slug);
-CREATE INDEX idx_blog_posts_is_published ON blog_posts(is_published);
+CREATE INDEX idx_blog_posts_status ON blog_posts(status);
 
 -- Client Levels table
 CREATE TABLE client_levels (
@@ -388,7 +391,7 @@ CREATE POLICY "Products are publicly readable" ON products
 
 ALTER TABLE blog_posts ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Published blog posts are publicly readable" ON blog_posts
-    FOR SELECT USING (is_published = true);
+    FOR SELECT USING (status = 'published');
 
 ALTER TABLE client_levels ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Client levels are publicly readable" ON client_levels
