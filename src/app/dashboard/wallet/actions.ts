@@ -1,31 +1,37 @@
 
 'use server';
 
-import { adminDb } from '@/lib/firebase/admin-config';
+import { createAdminClient } from '@/lib/supabase/server';
 import { getAuthenticatedUser } from '@/lib/auth/server-auth';
 import type { Withdrawal } from '@/types';
 
 export async function getWalletHistory(): Promise<{ withdrawals: Withdrawal[] }> {
-    // Get the authenticated user from session cookies
     const { uid: userId } = await getAuthenticatedUser();
     try {
-        // Use Admin SDK to bypass Firestore rules (server-side only)
-        const withdrawalsSnap = await adminDb.collection('withdrawals')
-            .where('userId', '==', userId)
-            .get();
+        const supabase = await createAdminClient();
+        const { data, error } = await supabase
+            .from('withdrawals')
+            .select('*')
+            .eq('user_id', userId)
+            .order('requested_at', { ascending: false });
 
-        const withdrawals = withdrawalsSnap.docs.map(doc => {
-            const data = doc.data();
-            return {
-                id: doc.id,
-                ...data,
-                requestedAt: data.requestedAt?.toDate() || new Date(),
-                completedAt: data.completedAt?.toDate(),
-            } as Withdrawal;
-        });
+        if (error) {
+            console.error("Error fetching wallet history:", error);
+            return { withdrawals: [] };
+        }
 
-        // Sort descending by request date
-        withdrawals.sort((a, b) => b.requestedAt.getTime() - a.requestedAt.getTime());
+        const withdrawals = (data || []).map(item => ({
+            id: item.id,
+            userId: item.user_id,
+            amount: item.amount,
+            paymentMethod: item.payment_method,
+            status: item.status,
+            requestedAt: new Date(item.requested_at),
+            completedAt: item.completed_at ? new Date(item.completed_at) : undefined,
+            withdrawalDetails: item.withdrawal_details,
+            txId: item.tx_id,
+            rejectionReason: item.rejection_reason,
+        } as Withdrawal));
 
         return { withdrawals };
 

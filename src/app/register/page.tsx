@@ -10,8 +10,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, User, Mail, Lock, KeyRound, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
 import { handleRegisterUser } from '../actions';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase/config';
+import { createClient } from '@/lib/supabase/client';
 
 function PasswordStrength({ password }: { password: string }) {
     const hasMinLength = password.length >= 6;
@@ -81,8 +80,16 @@ function RegisterForm() {
     if (result.success) {
         toast({ type: "success", title: "نجاح!", description: "تم إنشاء الحساب بنجاح. يتم تسجيل الدخول..." });
         try {
-            await signInWithEmailAndPassword(auth, email, password);
-             // Instead of pushing to dashboard, push to phone verification
+            const supabase = createClient();
+            const { error } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            });
+            
+            if (error) {
+                throw error;
+            }
+            
             router.push(`/phone-verification?userId=${result.userId}`);
         } catch (loginError) {
             toast({ variant: 'destructive', title: "فشل تسجيل الدخول التلقائي", description: "يرجى تسجيل الدخول يدويًا." });

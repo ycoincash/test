@@ -8,8 +8,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
+import { createClient } from '@/lib/supabase/client';
 import type { Broker } from '@/types';
 import {
     ArrowLeft, ShieldCheck, Globe, Star, Users, Award, Briefcase, CheckCircle, XCircle, Gauge, Scale,
@@ -88,12 +87,17 @@ export default function BrokerPreviewPage() {
             if (!brokerId) return;
             setIsLoading(true);
             try {
-                const brokerRef = doc(db, 'brokers', brokerId);
-                const brokerSnap = await getDoc(brokerRef);
-                if (brokerSnap.exists()) {
-                    setBroker({ id: brokerSnap.id, ...brokerSnap.data() } as Broker);
-                } else {
+                const supabase = createClient();
+                const { data, error } = await supabase
+                    .from('brokers')
+                    .select('*')
+                    .eq('id', brokerId)
+                    .single();
+                
+                if (error || !data) {
                     notFound();
+                } else {
+                    setBroker({ id: data.id, ...data } as Broker);
                 }
             } catch (error) {
                 console.error("Error fetching broker", error);

@@ -56,9 +56,9 @@ export default function ManageNotificationsPage() {
     const searchResults = useMemo(() => {
         if (!searchQuery) return [];
         const lowerCaseQuery = searchQuery.toLowerCase();
-        const selectedIds = new Set(selectedUsers.map(u => u.uid));
+        const selectedIds = new Set(selectedUsers.map(u => u.id));
         return allUsers.filter(user => 
-            !selectedIds.has(user.uid) && (
+            !selectedIds.has(user.id) && (
             user.name.toLowerCase().includes(lowerCaseQuery) ||
             user.email.toLowerCase().includes(lowerCaseQuery) ||
             String(user.clientId).includes(lowerCaseQuery)
@@ -67,13 +67,13 @@ export default function ManageNotificationsPage() {
 
     const handleSelectUser = (user: UserProfile) => {
         setSelectedUsers(prev => [...prev, user]);
-        form.setValue('userIds', [...(form.getValues('userIds') || []), user.uid]);
+        form.setValue('userIds', [...(form.getValues('userIds') || []), user.id]);
         setSearchQuery('');
     };
 
     const handleDeselectUser = (user: UserProfile) => {
-        setSelectedUsers(prev => prev.filter(u => u.uid !== user.uid));
-        form.setValue('userIds', (form.getValues('userIds') || []).filter(id => id !== user.uid));
+        setSelectedUsers(prev => prev.filter(u => u.id !== user.id));
+        form.setValue('userIds', (form.getValues('userIds') || []).filter(id => id !== user.id));
     };
 
     const onSubmit = async (data: FormData) => {
@@ -144,7 +144,7 @@ export default function ManageNotificationsPage() {
                                             {searchQuery && searchResults.length > 0 && (
                                                 <div className="max-h-40 overflow-y-auto border rounded-md">
                                                     {searchResults.map(user => (
-                                                        <button key={user.uid} type="button" onClick={() => handleSelectUser(user)} className="w-full text-right p-2 text-sm hover:bg-muted">
+                                                        <button key={user.id} type="button" onClick={() => handleSelectUser(user)} className="w-full text-right p-2 text-sm hover:bg-muted">
                                                             {user.name} ({user.email})
                                                         </button>
                                                     ))}
@@ -152,7 +152,7 @@ export default function ManageNotificationsPage() {
                                             )}
                                             <div className="space-y-2">
                                                 {selectedUsers.map(user => (
-                                                    <Badge key={user.uid} variant="secondary" className="mr-2">
+                                                    <Badge key={user.id} variant="secondary" className="mr-2">
                                                         {user.name}
                                                         <button type="button" onClick={() => handleDeselectUser(user)} className="mr-1 rounded-full bg-muted-foreground/20 text-muted-foreground hover:bg-destructive hover:text-destructive-foreground h-4 w-4 flex items-center justify-center">×</button>
                                                     </Badge>

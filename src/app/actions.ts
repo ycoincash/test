@@ -169,7 +169,7 @@ export async function getClientLevels(): Promise<ClientLevel[]> {
 
 export async function getNotificationsForUser(): Promise<Notification[]> {
     const user = await getAuthenticatedUser();
-    const userId = user.uid;
+    const userId = user.id;
     
     const supabase = await createAdminClient();
     const { data, error } = await supabase
@@ -196,7 +196,7 @@ export async function getNotificationsForUser(): Promise<Notification[]> {
 
 export async function markNotificationsAsRead(notificationIds: string[]) {
     const user = await getAuthenticatedUser();
-    const userId = user.uid;
+    const userId = user.id;
     
     const supabase = await createAdminClient();
     
@@ -213,7 +213,7 @@ export async function markNotificationsAsRead(notificationIds: string[]) {
 
 export async function getActiveFeedbackFormForUser(): Promise<FeedbackForm | null> {
     const user = await getAuthenticatedUser();
-    const userId = user.uid;
+    const userId = user.id;
     
     const supabase = await createAdminClient();
     
@@ -256,7 +256,7 @@ export async function submitFeedbackResponse(
     answers: Record<string, any>
 ): Promise<{ success: boolean, message: string }> {
     const user = await getAuthenticatedUser();
-    const userId = user.uid;
+    const userId = user.id;
     
     try {
         const supabase = await createAdminClient();
@@ -337,7 +337,7 @@ export async function getCategories(): Promise<ProductCategory[]> {
 
 export async function getOrders(): Promise<Order[]> {
     const user = await getAuthenticatedUser();
-    const userId = user.uid;
+    const userId = user.id;
     
     const supabase = await createAdminClient();
     const { data, error } = await supabase
@@ -369,7 +369,7 @@ export async function getOrders(): Promise<Order[]> {
 
 export async function getCashbackTransactions(): Promise<CashbackTransaction[]> {
     const user = await getAuthenticatedUser();
-    const userId = user.uid;
+    const userId = user.id;
     
     const supabase = await createAdminClient();
     const { data, error } = await supabase
@@ -407,7 +407,7 @@ export async function placeOrder(
     clientInfo: { deviceInfo: DeviceInfo, geoInfo: GeoInfo }
 ) {
     const user = await getAuthenticatedUser();
-    const userId = user.uid;
+    const userId = user.id;
     
     try {
         const supabase = await createAdminClient();
@@ -512,7 +512,7 @@ export async function sendVerificationEmail(): Promise<{ success: boolean; error
 
 export async function submitKycData(data: Omit<KycData, 'status' | 'submittedAt'>): Promise<{ success: boolean; error?: string }> {
     const user = await getAuthenticatedUser();
-    const userId = user.uid;
+    const userId = user.id;
     
     try {
         const supabase = await createAdminClient();
@@ -536,7 +536,7 @@ export async function submitKycData(data: Omit<KycData, 'status' | 'submittedAt'
 
 export async function submitAddressData(data: Omit<AddressData, 'status' | 'submittedAt'>): Promise<{ success: boolean; error?: string }> {
     const user = await getAuthenticatedUser();
-    const userId = user.uid;
+    const userId = user.id;
     
     try {
         const supabase = await createAdminClient();
@@ -560,7 +560,7 @@ export async function submitAddressData(data: Omit<AddressData, 'status' | 'subm
 
 export async function updateUserPhoneNumber(phoneNumber: string): Promise<{ success: boolean; error?: string }> {
     const user = await getAuthenticatedUser();
-    const userId = user.uid;
+    const userId = user.id;
     
     try {
         const supabase = await createAdminClient();
@@ -586,7 +586,7 @@ export async function adminUpdateUserPhoneNumber(targetUserId: string, phoneNumb
     const { data: userData } = await supabase
         .from('users')
         .select('role')
-        .eq('id', user.uid)
+        .eq('id', user.id)
         .single();
     
     if (userData?.role !== 'admin') {
@@ -611,7 +611,7 @@ export async function adminUpdateUserPhoneNumber(targetUserId: string, phoneNumb
 
 export async function getUserBalance() {
     const user = await getAuthenticatedUser();
-    const userId = user.uid;
+    const userId = user.id;
     
     const supabase = await createAdminClient();
     
@@ -656,7 +656,7 @@ export async function requestWithdrawal(
     payload: Omit<Withdrawal, 'id' | 'requestedAt' | 'userId'>
 ) {
     const user = await getAuthenticatedUser();
-    const userId = user.uid;
+    const userId = user.id;
     
     try {
         const supabase = await createAdminClient();
@@ -738,7 +738,7 @@ export async function getTradingAccounts(): Promise<TradingAccount[]> {
 
 export async function getUserTradingAccounts(): Promise<TradingAccount[]> {
     const user = await getAuthenticatedUser();
-    const userId = user.uid;
+    const userId = user.id;
     
     const supabase = await createAdminClient();
     const { data, error } = await supabase
@@ -764,7 +764,7 @@ export async function getUserTradingAccounts(): Promise<TradingAccount[]> {
 
 export async function getUserWithdrawals(): Promise<Withdrawal[]> {
     const user = await getAuthenticatedUser();
-    const userId = user.uid;
+    const userId = user.id;
     
     const supabase = await createAdminClient();
     const { data, error } = await supabase
@@ -799,7 +799,7 @@ export async function getAdminDashboardStats() {
     const { data: userData } = await supabase
         .from('users')
         .select('role')
-        .eq('id', user.uid)
+        .eq('id', user.id)
         .single();
     
     if (userData?.role !== 'admin') {
@@ -836,7 +836,7 @@ export async function getAdminDashboardStats() {
 
 export async function getUserReferralData() {
     const user = await getAuthenticatedUser();
-    const userId = user.uid;
+    const userId = user.id;
     
     const supabase = await createAdminClient();
     
@@ -856,7 +856,7 @@ export async function getUserReferralData() {
         .eq('referred_by', userId);
     
     const referralsList = (referrals || []).map(r => ({
-        uid: r.id,
+        id: r.id,
         name: r.name,
         createdAt: new Date(r.created_at),
         status: r.status,
@@ -888,9 +888,9 @@ export async function getUserReferralData() {
     
     return {
         userProfile: {
-            uid: userData.id,
+            id: userData.id,
             referralCode: userData.referral_code,
-            referrals: referralsList.map(r => r.uid),
+            referrals: referralsList.map(r => r.id),
         },
         referrals: referralsList,
         commissionHistory,
@@ -918,7 +918,7 @@ export async function submitTradingAccount(
     accountNumber: string
 ): Promise<{ success: boolean; message: string }> {
     const user = await getAuthenticatedUser();
-    const userId = user.uid;
+    const userId = user.id;
     
     const normalizedAccountNumber = accountNumber.trim();
     

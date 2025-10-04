@@ -27,7 +27,7 @@ function PhoneVerificationForm() {
     const [defaultCountry, setDefaultCountry] = useState<string>('SA');
     const targetUserId = searchParams.get('userId');
     // Only admin mode if user is actually an admin AND targetUserId differs from current user
-    const isAdminMode = user?.profile?.admin && targetUserId && targetUserId !== user?.uid;
+    const isAdminMode = user?.profile?.admin && targetUserId && targetUserId !== user?.id;
     
     useEffect(() => {
         if (!targetUserId && !user) {

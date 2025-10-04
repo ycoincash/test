@@ -20,7 +20,7 @@ import { getClientLevels, getUserReferralData } from '@/app/actions';
 import { Progress } from '@/components/ui/progress';
 import { Label } from '@/components/ui/label';
 
-type ReferralInfo = Pick<UserProfile, 'uid' | 'name' | 'createdAt' | 'status'>;
+type ReferralInfo = Pick<UserProfile, 'id' | 'name' | 'createdAt' | 'status'>;
 
 const getStatusText = (status: UserStatus) => {
     switch (status) {
@@ -113,7 +113,7 @@ function ReferralsListTab({ referrals, isLoading }: { referrals: ReferralInfo[],
                         </div>
                     ) : referrals.length > 0 ? (
                         referrals.map(ref => (
-                            <div key={ref.uid} className="flex items-center gap-3 p-2 rounded-md hover:bg-muted/50">
+                            <div key={ref.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-muted/50">
                                 <Avatar>
                                     <AvatarFallback>{ref.name ? ref.name.charAt(0).toUpperCase() : '?'}</AvatarFallback>
                                 </Avatar>

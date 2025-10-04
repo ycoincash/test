@@ -8,8 +8,7 @@ import React from "react";
 
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase/config";
+import { createClient } from "@/lib/supabase/client";
 import type { Product } from "@/types";
 import { Loader2, ArrowLeft, ShoppingCart, Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -47,12 +46,26 @@ export default function ProductDetailPage() {
             if (!productId) return;
             setIsLoading(true);
             try {
-                const productRef = doc(db, 'products', productId);
-                const productSnap = await getDoc(productRef);
-                if (productSnap.exists()) {
-                    setProduct({ id: productSnap.id, ...productSnap.data() } as Product);
-                } else {
+                const supabase = createClient();
+                const { data, error } = await supabase
+                    .from('products')
+                    .select('*')
+                    .eq('id', productId)
+                    .single();
+                
+                if (error || !data) {
                     notFound();
+                } else {
+                    setProduct({
+                        id: data.id,
+                        name: data.name,
+                        description: data.description,
+                        price: data.price,
+                        imageUrl: data.image_url,
+                        categoryId: data.category_id,
+                        categoryName: data.category_name,
+                        stock: data.stock,
+                    } as Product);
                 }
             } catch (error) {
                 console.error("Error fetching product:", error);

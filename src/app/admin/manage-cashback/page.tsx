@@ -77,7 +77,7 @@ export default function ManageCashbackPage() {
         return accounts
             .filter(acc => acc.status === 'Approved')
             .map(acc => {
-                const user = users.find(u => u.uid === acc.userId);
+                const user = users.find(u => u.id === acc.userId);
                 return {
                     ...acc,
                     userName: user?.name || 'مستخدم غير معروف',

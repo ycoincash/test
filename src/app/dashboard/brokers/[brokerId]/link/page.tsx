@@ -12,8 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { useAuthContext } from '@/hooks/useAuthContext';
-import { db } from '@/lib/firebase/config';
-import { doc, getDoc } from 'firebase/firestore';
+import { createClient } from '@/lib/supabase/client';
 import { submitTradingAccount } from '@/app/actions';
 import type { Broker } from '@/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -55,12 +54,17 @@ export default function BrokerLinkPage() {
       if (!brokerId) return;
       setIsBrokerLoading(true);
       try {
-        const brokerRef = doc(db, 'brokers', brokerId);
-        const brokerSnap = await getDoc(brokerRef);
-        if (brokerSnap.exists()) {
-          setBroker({ id: brokerSnap.id, ...brokerSnap.data() } as Broker);
-        } else {
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from('brokers')
+          .select('*')
+          .eq('id', brokerId)
+          .single();
+        
+        if (error || !data) {
           notFound();
+        } else {
+          setBroker({ id: data.id, ...data } as Broker);
         }
       } catch (error) {
         console.error("Error fetching broker", error);
@@ -80,7 +84,6 @@ export default function BrokerLinkPage() {
     },
   });
 
-  // Effect to sync URL param to form state and advance step
   useEffect(() => {
     const action = searchParams.get('action');
     if (action === 'existing') {
@@ -263,7 +266,6 @@ function Step1({ brokerName }: { brokerName: string }) {
 }
 
 function Step2({ hasAccount, broker }: { hasAccount: string | undefined; broker: Broker }) {
-    // Fallback to legacy instructions if new structure doesn't exist.
     const isNewStructure = !!broker.basicInfo;
     const brokerName = isNewStructure ? broker.basicInfo.broker_name : broker.name;
     const description = isNewStructure ? broker.instructions?.description || "اتبع الرابط لفتح حساب جديد." : "اتبع الرابط لفتح حساب جديد.";

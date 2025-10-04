@@ -6,8 +6,7 @@ import { useParams, useRouter, notFound } from "next/navigation";
 import { PageHeader } from "@/components/shared/PageHeader";
 import type { TradingAccount, CashbackTransaction } from "@/types";
 import { useAuthContext } from "@/hooks/useAuthContext";
-import { db } from "@/lib/firebase/config";
-import { collection, query, where, getDocs, doc, getDoc, Timestamp } from "firebase/firestore";
+import { createClient } from "@/lib/supabase/client";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -48,30 +47,56 @@ export default function AccountDetailPage() {
             }
             
             try {
-                // Fetch the specific account
-                const accountRef = doc(db, 'tradingAccounts', accountId);
-                const accountSnap = await getDoc(accountRef);
+                const supabase = createClient();
+                
+                const { data: accountData, error: accountError } = await supabase
+                    .from('trading_accounts')
+                    .select('*')
+                    .eq('id', accountId)
+                    .eq('user_id', user.id)
+                    .single();
 
-                if (!accountSnap.exists() || accountSnap.data().userId !== user.uid) {
+                if (accountError || !accountData) {
                     setIsLoading(false);
                     return notFound();
                 }
-                const accountData = accountSnap.data();
-                setAccount({ id: accountSnap.id, ...accountData, createdAt: (accountData.createdAt as Timestamp).toDate() } as TradingAccount);
 
-                // Fetch transactions for this specific account
-                const transactionsQuery = query(
-                    collection(db, "cashbackTransactions"), 
-                    where("userId", "==", user.uid),
-                    where("accountId", "==", accountId)
-                );
-                const transactionsSnapshot = await getDocs(transactionsQuery);
-                const userTransactions = transactionsSnapshot.docs.map(doc => {
-                    const data = doc.data();
-                    return { id: doc.id, ...data, date: (data.date as Timestamp).toDate() } as CashbackTransaction
-                });
-                userTransactions.sort((a, b) => b.date.getTime() - a.date.getTime());
-                setTransactions(userTransactions);
+                setAccount({
+                    id: accountData.id,
+                    userId: accountData.user_id,
+                    broker: accountData.broker,
+                    accountNumber: accountData.account_number,
+                    status: accountData.status,
+                    createdAt: new Date(accountData.created_at),
+                    rejectionReason: accountData.rejection_reason,
+                } as TradingAccount);
+
+                const { data: transactionsData, error: transactionsError } = await supabase
+                    .from('cashback_transactions')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .eq('account_id', accountId)
+                    .order('date', { ascending: false });
+
+                if (!transactionsError && transactionsData) {
+                    const userTransactions = transactionsData.map(item => ({
+                        id: item.id,
+                        userId: item.user_id,
+                        accountId: item.account_id,
+                        accountNumber: item.account_number,
+                        broker: item.broker,
+                        date: new Date(item.date),
+                        tradeDetails: item.trade_details,
+                        cashbackAmount: item.cashback_amount,
+                        referralBonusTo: item.referral_bonus_to,
+                        referralBonusAmount: item.referral_bonus_amount,
+                        sourceUserId: item.source_user_id,
+                        sourceType: item.source_type,
+                        transactionId: item.transaction_id,
+                        note: item.note,
+                    } as CashbackTransaction));
+                    setTransactions(userTransactions);
+                }
 
             } catch (error) {
                 console.error("Error fetching data: ", error);

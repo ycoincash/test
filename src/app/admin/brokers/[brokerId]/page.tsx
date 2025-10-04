@@ -43,8 +43,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Broker } from "@/types";
 import { addBroker, updateBroker } from "@/app/admin/manage-brokers/actions";
 import { TermsBank } from "@/lib/terms-bank";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase/config";
+import { createClient } from "@/lib/supabase/client";
 
 const licenseSchema = z.object({
     authority: z.string().min(1, "جهة الترخيص مطلوبة"),
@@ -277,13 +276,17 @@ export default function BrokerFormPage() {
         if (!isNew) {
             const fetchBroker = async () => {
                 setIsLoading(true);
-                const brokerRef = doc(db, 'brokers', brokerId);
-                const brokerSnap = await getDoc(brokerRef);
-                if (brokerSnap.exists()) {
-                    const data = { id: brokerSnap.id, ...brokerSnap.data() } as Broker;
-                    form.reset(getSafeDefaultValues(data));
-                } else {
+                const supabase = createClient();
+                const { data, error } = await supabase
+                    .from('brokers')
+                    .select('*')
+                    .eq('id', brokerId)
+                    .single();
+                
+                if (error || !data) {
                     notFound();
+                } else {
+                    form.reset(getSafeDefaultValues({ id: data.id, ...data } as Broker));
                 }
                 setIsLoading(false);
             };

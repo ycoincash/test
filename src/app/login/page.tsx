@@ -15,14 +15,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { auth, db, googleProvider, appleProvider } from '@/lib/firebase/config';
-import { signInWithEmailAndPassword, signInWithPopup, UserCredential } from 'firebase/auth';
-import { doc, getDoc, setDoc, Timestamp, runTransaction, collection } from "firebase/firestore";
+import { createClient } from "@/lib/supabase/client";
 import { Loader2, Mail, Lock } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
-import { generateReferralCode } from '@/lib/referral';
-import { logUserActivity } from '../admin/actions';
-import { getClientSessionInfo } from '@/lib/device-info';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { handleForgotPassword } from '../actions';
 
@@ -32,7 +27,7 @@ const GoogleIcon = () => (
 );
 
 const AppleIcon = () => (
-    <svg className="h-5 w-5" viewBox="0 0 24 24"><path fill="currentColor" d="M15.22,6.15a3.33,3.33,0,0,0-2.3,1.07,3.61,3.61,0,0,0-1.12,2.44,4.24,4.24,0,0,0,.7,2.47,4.3,4.3,0,0,0,1.88,1.52,3.34,3.34,0,0,0,2.62,.19c.14-.06.28-.11.41-.18a3.34,3.34,0,0,0,1.21-1.25,4.06,4.06,0,0,0,.4-1.95,3.4,3.4,0,0,0-2.14-3.35,5.82,5.82,0,0,0-1.66-.22Zm.46,6.38a2.59,2.59,0,0,1-1.67.6,2.37,2.37,0,0,1-1.66-1.14,2.77,2.77,0,0,1-.53-1.6,2.53,2.53,0,0,1,.87-2,2.34,2.34,0,0,1,1.54-.64c.2,0,.39,0,.58,0a2.66,2.66,0,0,1,2.1,1.23,2.94,2.94,0,0,1,.26,1.49A2.46,2.46,0,0,1,15.68,12.53ZM12,24A12,12,0,1,0,0,12,12,12,0,0,0,12,24Zm-1.5-18.73a4.2,4.2,0,0,1,3.29-1.84,4,4,0,0,1,1.69.34,4.22,4.22,0,0,0-1.39-1.07,4.52,4.52,0,0,0-2.82-.49,4.45,4.45,0,0,0-3.4,2.1,4.42,4.42,0,0,0-1.35,3.22,4.2,4.2,0,0,0,1.35,3.25,4.51,4.51,0,0,0,5.83.21,4.18,4.18,0,0,0,1.4-1.17,4.23,4.23,0,0,1-3.32,1.86,4.07,4.07,0,0,1-1.7-.35,4.45,4.45,0,0,1-2.43-3A4.52,4.52,0,0,1,10.5,5.27Z"/></svg>
+    <svg className="h-5 w-5" viewBox="0 0 24 24"><path fill="currentColor" d="M15.22,6.15a3.33,3.33,0,0,0-2.3,1.07,3.61,3.61,0,0,0-1.12,2.44,4.24,4.24,0,0,0,.7,2.47,4.3,4.3,0,0,0,1.88,1.52,3.34,3.34,0,0,0,2.62,.19c.14-.06.28-.11.41-.18a3.34,3.34,0,0,0,1.21-1.25,4.06,4.06,0,0,0,.4-1.95,3.4,3.4,0,0,0-2.14-3.35,5.82,5.82,0,0,0-1.66-.22Zm.46,6.38a2.59,2.59,0,0,1-1.67.6,2.37,2.37,0,0,1-1.66-1.14,2.77,2.77,0,0,1-.53-1.6,2.53,2.53,0,0,1,.87-2,2.34,2.34,0,0,1,1.54-.64c.2,0,.39,0,.58,0a2.66,2.66,0,0,1,2.10,1.23,2.94,2.94,0,0,1,.26,1.49A2.46,2.46,0,0,1,15.68,12.53ZM12,24A12,12,0,1,0,0,12,12,12,0,0,0,12,24Zm-1.5-18.73a4.2,4.2,0,0,1,3.29-1.84,4,4,0,0,1,1.69.34,4.22,4.22,0,0,0-1.39-1.07,4.52,4.52,0,0,0-2.82-.49,4.45,4.45,0,0,0-3.4,2.1,4.42,4.42,0,0,0-1.35,3.22,4.2,4.2,0,0,0,1.35,3.25,4.51,4.51,0,0,0,5.83.21,4.18,4.18,0,0,0,1.4-1.17,4.23,4.23,0,0,1-3.32,1.86,4.07,4.07,0,0,1-1.7-.35,4.45,4.45,0,0,1-2.43-3A4.52,4.52,0,0,1,10.5,5.27Z"/></svg>
 );
 
 
@@ -47,86 +42,38 @@ export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
 
-  const handleLoginSuccess = async (userCredential: UserCredential) => {
-    const user = userCredential.user;
-    const clientInfo = await getClientSessionInfo();
-    const userDocRef = doc(db, "users", user.uid);
-    let userDoc = await getDoc(userDocRef);
-    let userProfile;
-
-    // Self-healing: If user exists in Auth but not Firestore, create their profile now.
-    if (!userDoc.exists()) {
-        console.warn(`User ${user.uid} authenticated but has no profile. Creating one now.`);
-        
-        await runTransaction(db, async (transaction) => {
-            const counterRef = doc(db, 'counters', 'userCounter');
-            const counterSnap = await transaction.get(counterRef);
-            const lastId = counterSnap.exists() ? counterSnap.data().lastId : 100000;
-            const newClientId = lastId + 1;
-            
-            userProfile = { 
-                uid: user.uid,
-                name: user.displayName || "New User", 
-                email: user.email!, 
-                role: "user" as const,
-                clientId: newClientId,
-                status: 'NEW' as const,
-                createdAt: Timestamp.now(),
-                country: clientInfo.geoInfo.country || null,
-                referralCode: generateReferralCode(user.displayName || "user"),
-                referredBy: null,
-                referrals: [],
-                level: 1,
-                monthlyEarnings: 0,
-            };
-            transaction.set(userDocRef, userProfile);
-            transaction.set(counterRef, { lastId: newClientId }, { merge: true });
-        });
-        
-        await logUserActivity(user.uid, 'signup', clientInfo, { method: userCredential.providerId || 'social_login_fix' });
-    } else {
-        userProfile = { uid: user.uid, ...userDoc.data() };
-        await logUserActivity(user.uid, 'login', clientInfo, { method: userCredential.providerId || 'email' });
-    }
-
-    // Set secure HTTP-only cookie via middleware-managed endpoint
-    try {
-        const idToken = await user.getIdToken();
-        const response = await fetch('/api/login', {
-            method: 'POST',
-            headers: { 
-                'Authorization': `Bearer ${idToken}`,
-            },
-        });
-
-        if (!response.ok) {
-            throw new Error('Failed to create session');
-        }
-    } catch (error) {
-        console.error('Session creation error:', error);
-        toast({
-            variant: "destructive",
-            title: "Session Error",
-            description: "Failed to create secure session. Please try logging in again.",
-        });
-        return;
-    }
+  const handleLoginSuccess = async (userId: string) => {
+    const supabase = createClient();
     
+    const { data: userProfile, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (error || !userProfile) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load user profile. Please try again.",
+      });
+      return;
+    }
+
     window.dispatchEvent(new CustomEvent('refetchUser'));
 
     toast({
-        type: "success",
-        title: "Success",
-        description: "Logged in successfully.",
+      type: "success",
+      title: "Success",
+      description: "Logged in successfully.",
     });
 
-    // Redirect to phone verification if number is missing
-    if (!userProfile?.phoneNumber) {
-        router.push(`/phone-verification?userId=${user.uid}`);
-        return;
+    if (!userProfile.phone_number) {
+      router.push(`/phone-verification?userId=${userId}`);
+      return;
     }
 
-    if (userProfile?.role === 'admin') {
+    if (userProfile.role === 'admin') {
       router.push('/admin/dashboard');
     } else {
       router.push('/dashboard');
@@ -137,8 +84,19 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      await handleLoginSuccess(userCredential);
+      const supabase = createClient();
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data.user) {
+        await handleLoginSuccess(data.user.id);
+      }
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -150,21 +108,27 @@ export default function LoginPage() {
     }
   };
 
-  const handleSocialLogin = async (provider: typeof googleProvider | typeof appleProvider) => {
+  const handleSocialLogin = async (provider: 'google' | 'apple') => {
     setIsSocialLoading(true);
     try {
-        const userCredential = await signInWithPopup(auth, provider);
-        await handleLoginSuccess(userCredential);
+      const supabase = createClient();
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
     } catch (error: any) {
-         toast({
-            variant: "destructive",
-            title: "Login Failed",
-            description: error.code === 'auth/account-exists-with-different-credential'
-                ? "An account with this email already exists. Please sign in with your original method."
-                : "An error occurred during sign-in.",
-        });
-    } finally {
-        setIsSocialLoading(false);
+      toast({
+        variant: "destructive",
+        title: "Login Failed",
+        description: "An error occurred during sign-in.",
+      });
+      setIsSocialLoading(false);
     }
   }
 
@@ -203,10 +167,10 @@ export default function LoginPage() {
         <Card>
             <CardContent className="p-4">
                 <div className="grid grid-cols-2 gap-2">
-                    <Button variant="outline" onClick={() => handleSocialLogin(googleProvider)} disabled={isSocialLoading || isLoading}>
+                    <Button variant="outline" onClick={() => handleSocialLogin('google')} disabled={isSocialLoading || isLoading}>
                         {isSocialLoading ? <Loader2 className="animate-spin" /> : <><GoogleIcon /> Google</>}
                     </Button>
-                    <Button variant="outline" onClick={() => handleSocialLogin(appleProvider)} disabled={isSocialLoading || isLoading}>
+                    <Button variant="outline" onClick={() => handleSocialLogin('apple')} disabled={isSocialLoading || isLoading}>
                        {isSocialLoading ? <Loader2 className="animate-spin" /> : <><AppleIcon /> Apple</>}
                     </Button>
                 </div>
@@ -296,5 +260,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
-    

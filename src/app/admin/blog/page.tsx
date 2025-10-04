@@ -70,7 +70,7 @@ function PostForm({ post, onSuccess, onCancel }: { post?: BlogPost | null; onSuc
             slug,
             tags: data.tags ? data.tags.split(',').map(tag => tag.trim()) : [],
             authorName: user.profile.name,
-            authorId: user.uid,
+            authorId: user.id,
         };
 
         const result = post

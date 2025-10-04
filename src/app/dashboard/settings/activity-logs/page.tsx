@@ -26,7 +26,7 @@ export default function UserActivityLogsPage() {
             if (!user) return;
             setIsLoading(true);
             try {
-                const userLogs = await getUserActivityLogs(user.uid);
+                const userLogs = await getUserActivityLogs(user.id);
                 setLogs(userLogs);
             } catch (error) {
                 console.error("Failed to fetch logs:", error);

@@ -67,7 +67,7 @@ export const getColumns = (levelMap: Map<number, string>): ColumnDef<UserProfile
         return (
             <div 
                 className="font-medium cursor-pointer hover:underline"
-                onClick={() => router.push(`/admin/users/${row.original.uid}`)}
+                onClick={() => router.push(`/admin/users/${row.original.id}`)}
             >
                 {row.getValue("name")}
             </div>
@@ -123,15 +123,15 @@ export const getColumns = (levelMap: Map<number, string>): ColumnDef<UserProfile
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => navigator.clipboard.writeText(user.uid)}>
+            <DropdownMenuItem onClick={() => navigator.clipboard.writeText(user.id)}>
               نسخ معرف المستخدم
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => router.push(`/admin/users/${user.uid}`)}>
+            <DropdownMenuItem onClick={() => router.push(`/admin/users/${user.id}`)}>
                 <User className="ml-2 h-4 w-4" />
                 عرض التفاصيل
             </DropdownMenuItem>
-             <DropdownMenuItem onClick={() => router.push(`/admin/manage-verifications?userId=${user.uid}`)}>
+             <DropdownMenuItem onClick={() => router.push(`/admin/manage-verifications?userId=${user.id}`)}>
                 <ShieldAlert className="ml-2 h-4 w-4" />
                 مراجعة التحقق
             </DropdownMenuItem>

@@ -4,8 +4,7 @@
 import { useEffect, useState } from "react";
 import { useParams, notFound, useRouter } from 'next/navigation';
 import { useAuthContext } from "@/hooks/useAuthContext";
-import { db } from "@/lib/firebase/config";
-import { doc, getDoc } from "firebase/firestore";
+import { createClient } from "@/lib/supabase/client";
 import type { Withdrawal } from "@/types";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -44,19 +43,29 @@ export default function WithdrawalDetailPage() {
             }
 
             try {
-                const docRef = doc(db, 'withdrawals', withdrawalId);
-                const docSnap = await getDoc(docRef);
+                const supabase = createClient();
+                const { data, error } = await supabase
+                    .from('withdrawals')
+                    .select('*')
+                    .eq('id', withdrawalId)
+                    .eq('user_id', user.id)
+                    .single();
 
-                if (docSnap.exists() && docSnap.data().userId === user.uid) {
-                    const data = docSnap.data();
-                    setWithdrawal({
-                        id: docSnap.id,
-                        ...data,
-                        requestedAt: (data.requestedAt as any).toDate(),
-                        completedAt: data.completedAt ? (data.completedAt as any).toDate() : undefined,
-                    } as Withdrawal);
-                } else {
+                if (error || !data) {
                     notFound();
+                } else {
+                    setWithdrawal({
+                        id: data.id,
+                        userId: data.user_id,
+                        amount: data.amount,
+                        paymentMethod: data.payment_method,
+                        status: data.status,
+                        requestedAt: new Date(data.requested_at),
+                        completedAt: data.completed_at ? new Date(data.completed_at) : undefined,
+                        withdrawalDetails: data.withdrawal_details,
+                        txId: data.tx_id,
+                        rejectionReason: data.rejection_reason,
+                    } as Withdrawal);
                 }
             } catch (error) {
                 console.error("Error fetching withdrawal:", error);
@@ -99,7 +108,6 @@ export default function WithdrawalDetailPage() {
         return notFound();
     }
     
-    // Convert camelCase to Title Case for display
     const formatDetailLabel = (label: string) => {
         const result = label.replace(/([A-Z])/g, " $1");
         return result.charAt(0).toUpperCase() + result.slice(1);

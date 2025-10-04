@@ -108,7 +108,7 @@ export default function ManageAccountsPage() {
                 getUsers()
             ]);
 
-            const usersMap = new Map(fetchedUsers.map(u => [u.uid, u]));
+            const usersMap = new Map(fetchedUsers.map(u => [u.id, u]));
 
             const enrichedAccounts = fetchedAccounts.map(acc => ({
                 ...acc,

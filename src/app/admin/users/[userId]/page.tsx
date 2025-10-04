@@ -71,7 +71,7 @@ function EditUserDialog({ userProfile, onSuccess }: { userProfile: UserProfile, 
     const onSubmit = async (values: EditUserForm) => {
         if (!userProfile) return;
         setIsSubmitting(true);
-        const result = await updateUser(userProfile.uid, values);
+        const result = await updateUser(userProfile.id, values);
         if (result.success) {
             toast({ title: "نجاح", description: result.message });
             onSuccess();

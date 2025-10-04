@@ -165,7 +165,7 @@ export default function ManageWithdrawalsPage() {
                 getUsers()
             ]);
             
-            const usersMap = new Map(usersData.map(u => [u.uid, u]));
+            const usersMap = new Map(usersData.map(u => [u.id, u]));
             
             const enrichedData = data.map(w => ({
                 ...w,

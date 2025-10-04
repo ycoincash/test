@@ -227,7 +227,7 @@ export default function VerificationPage() {
     
     const handleAddPhoneNumber = () => {
         if (!user) return;
-        router.push(`/phone-verification?userId=${user.uid}`);
+        router.push(`/phone-verification?userId=${user.id}`);
     };
 
     if (isLoading || !user?.profile) {
