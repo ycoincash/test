@@ -13,3 +13,16 @@ export async function GET(request: Request) {
 
   return NextResponse.redirect(`${origin}/dashboard`)
 }
+
+export async function POST(request: Request) {
+  const supabase = await createClient()
+  const body = await request.json()
+
+  if (body.event === 'SIGNED_IN' && body.session) {
+    await supabase.auth.setSession(body.session)
+  } else if (body.event === 'SIGNED_OUT') {
+    await supabase.auth.signOut()
+  }
+
+  return NextResponse.json({ success: true })
+}
