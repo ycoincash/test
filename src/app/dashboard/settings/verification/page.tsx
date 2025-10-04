@@ -2,83 +2,23 @@
 "use client"
 
 import { useAuthContext } from "@/hooks/useAuthContext";
-import React, { useState } from 'react';
-import { Loader2, ChevronRight, Mail, Phone, User, Home, ArrowLeft } from "lucide-react";
+import React from 'react';
+import { Loader2, ChevronRight, Mail, Phone, User, Home } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { sendVerificationEmail } from "@/app/actions";
-import type { KycData, AddressData } from "@/types";
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { KycVerificationForm } from "@/components/verification/KycVerificationForm";
-import { AddressVerificationForm } from "@/components/verification/AddressVerificationForm";
-
-// KYC Dialog Component
-function KycFormDialog({ onKycSubmit, userCountry }: { onKycSubmit: () => void; userCountry?: string | null }) {
-    const [isOpen, setIsOpen] = useState(false);
-
-    return (
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <DialogTrigger asChild>
-                <Button variant="ghost" className="h-full w-full p-0 justify-start">
-                    <VerificationItemContent icon={User} title="التحقق من الهوية (KYC)" status="Not Verified" />
-                </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle>التحقق من الهوية (KYC)</DialogTitle>
-                </DialogHeader>
-                <KycVerificationForm 
-                    onSuccess={() => {
-                        onKycSubmit();
-                        setIsOpen(false);
-                    }} 
-                    onCancel={() => setIsOpen(false)}
-                    userCountry={userCountry}
-                />
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-// Address Dialog Component
-function AddressFormDialog({ onAddressSubmit, userCountry }: { onAddressSubmit: () => void; userCountry?: string | null }) {
-    const [isOpen, setIsOpen] = useState(false);
-
-    return (
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <DialogTrigger asChild>
-                <Button variant="ghost" className="h-full w-full p-0 justify-start">
-                    <VerificationItemContent icon={Home} title="التحقق من العنوان" status="Not Verified" />
-                </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle>التحقق من العنوان</DialogTitle>
-                </DialogHeader>
-                <AddressVerificationForm 
-                    onSuccess={() => {
-                        onAddressSubmit();
-                        setIsOpen(false);
-                    }} 
-                    onCancel={() => setIsOpen(false)}
-                    userCountry={userCountry}
-                />
-            </DialogContent>
-        </Dialog>
-    );
-}
 
 // Reusable UI part for each verification item
-function VerificationItemContent({ icon: Icon, title, status }: { icon: React.ElementType, title: string, status: 'Verified' | 'Not Verified' | 'Pending' | 'Add' }) {
+function VerificationItemContent({ icon: Icon, title, status }: { icon: React.ElementType, title: string, status: 'Verified' | 'Not Verified' | 'Pending' | 'Rejected' | 'Add' }) {
     const getStatusText = () => {
         switch (status) {
             case 'Verified': return 'تم التحقق';
             case 'Not Verified': return 'لم يتم التحقق';
             case 'Pending': return 'قيد المراجعة';
+            case 'Rejected': return 'مرفوض';
             case 'Add': return 'إضافة';
             default: return status;
         }
@@ -135,7 +75,7 @@ export default function VerificationPage() {
     const { profile } = user;
 
     // Determine statuses
-    const emailStatus = user.emailVerified ? 'Verified' : 'Not Verified';
+    const emailStatus = user.email_confirmed_at ? 'Verified' : 'Not Verified';
     const phoneStatus = !profile.phoneNumber ? 'Add' : profile.phoneNumberVerified ? 'Verified' : 'Pending';
     const kycStatus = !profile.kycData ? 'Not Verified' : profile.kycData.status;
     const addressStatus = !profile.addressData ? 'Not Verified' : profile.addressData.status;
@@ -161,18 +101,22 @@ export default function VerificationPage() {
             </button>
              
             {/* Identity (KYC) Verification */}
-            {kycStatus === 'Verified' || kycStatus === 'Pending' ? (
-                 <VerificationItemContent icon={User} title="التحقق من الهوية (KYC)" status={kycStatus} />
-            ) : (
-                <KycFormDialog onKycSubmit={refetchUserData} userCountry={profile.country} />
-            )}
+            <button 
+                className="w-full text-left"
+                onClick={(kycStatus === 'Not Verified' || kycStatus === 'Rejected') ? () => router.push('/dashboard/settings/verification/kyc') : undefined}
+                disabled={kycStatus === 'Verified' || kycStatus === 'Pending'}
+            >
+                <VerificationItemContent icon={User} title="التحقق من الهوية (KYC)" status={kycStatus} />
+            </button>
 
             {/* Address Verification */}
-            {addressStatus === 'Verified' || addressStatus === 'Pending' ? (
-                 <VerificationItemContent icon={Home} title="التحقق من العنوان" status={addressStatus} />
-            ) : (
-                <AddressFormDialog onAddressSubmit={refetchUserData} userCountry={profile.country} />
-            )}
+            <button 
+                className="w-full text-left"
+                onClick={(addressStatus === 'Not Verified' || addressStatus === 'Rejected') ? () => router.push('/dashboard/settings/verification/address') : undefined}
+                disabled={addressStatus === 'Verified' || addressStatus === 'Pending'}
+            >
+                <VerificationItemContent icon={Home} title="التحقق من العنوان" status={addressStatus} />
+            </button>
         </div>
     );
 }
