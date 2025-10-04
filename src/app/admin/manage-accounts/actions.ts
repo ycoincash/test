@@ -1,40 +1,53 @@
 'use server';
 
-import { adminDb } from '@/lib/firebase/admin-config';
-import * as admin from 'firebase-admin';
+import { createAdminClient } from '@/lib/supabase/server';
 import type { TradingAccount } from '@/types';
-import { createNotification } from '../actions';
 
-const safeToDate = (timestamp: any): Date | undefined => {
-  if (!timestamp) return undefined;
-  if (timestamp instanceof Date) return timestamp;
-  if (timestamp?._seconds) {
-    return new Date(timestamp._seconds * 1000);
+async function createNotification(
+  userId: string,
+  message: string,
+  type: 'account' | 'cashback' | 'withdrawal' | 'general' | 'store' | 'loyalty' | 'announcement',
+  link?: string
+) {
+  const supabase = await createAdminClient();
+  
+  const { error } = await supabase
+    .from('notifications')
+    .insert({
+      user_id: userId,
+      message,
+      type,
+      link,
+      is_read: false,
+      created_at: new Date().toISOString(),
+    });
+  
+  if (error) {
+    console.error('Error creating notification:', error);
   }
-  if (typeof timestamp?.toDate === 'function') {
-    return timestamp.toDate();
-  }
-  return undefined;
-};
+}
 
 export async function getTradingAccounts(): Promise<TradingAccount[]> {
-  const accountsSnapshot = await adminDb.collection('tradingAccounts').get();
-  const accounts: TradingAccount[] = [];
+  const supabase = await createAdminClient();
+  
+  const { data, error } = await supabase
+    .from('trading_accounts')
+    .select('*');
 
-  accountsSnapshot.docs.forEach((doc) => {
-    try {
-      const data = doc.data();
-      accounts.push({
-        id: doc.id,
-        ...data,
-        createdAt: safeToDate(data.createdAt) || new Date(),
-      } as TradingAccount);
-    } catch (error) {
-      console.error(`Error processing trading account ${doc.id}:`, error);
-    }
-  });
+  if (error) {
+    console.error('Error fetching trading accounts:', error);
+    return [];
+  }
 
-  return accounts;
+  return (data || []).map((acc) => ({
+    id: acc.id,
+    userId: acc.user_id,
+    broker: acc.broker,
+    accountNumber: acc.account_number,
+    status: acc.status,
+    createdAt: new Date(acc.created_at),
+    rejectionReason: acc.rejection_reason,
+  }));
 }
 
 export async function updateTradingAccountStatus(
@@ -42,57 +55,65 @@ export async function updateTradingAccountStatus(
   status: 'Approved' | 'Rejected',
   reason?: string
 ) {
-  return adminDb
-    .runTransaction(async (transaction) => {
-      const accountRef = adminDb.collection('tradingAccounts').doc(accountId);
-      const accountSnap = await transaction.get(accountRef);
+  try {
+    const supabase = await createAdminClient();
+    
+    const { data: account, error: fetchError } = await supabase
+      .from('trading_accounts')
+      .select('*')
+      .eq('id', accountId)
+      .single();
 
-      if (!accountSnap.exists) {
-        throw new Error('لم يتم العثور على الحساب');
+    if (fetchError || !account) {
+      throw new Error('لم يتم العثور على الحساب');
+    }
+
+    if (account.status !== 'Pending') {
+      throw new Error(`لا يمكن تحديث الحساب. الحالة الحالية هي ${account.status}.`);
+    }
+
+    const updateData: { status: 'Approved' | 'Rejected'; rejection_reason?: string } = {
+      status,
+    };
+    let message = `تم ${status === 'Approved' ? 'الموافقة على' : 'رفض'} حساب التداول الخاص بك ${
+      account.account_number
+    }.`;
+
+    if (status === 'Rejected') {
+      if (!reason) throw new Error('سبب الرفض مطلوب.');
+      updateData.rejection_reason = reason;
+      message += ` السبب: ${reason}`;
+    } else {
+      const { data: user } = await supabase
+        .from('users')
+        .select('status')
+        .eq('id', account.user_id)
+        .single();
+
+      if (user && user.status === 'NEW') {
+        await supabase
+          .from('users')
+          .update({ status: 'Active' })
+          .eq('id', account.user_id);
       }
+      updateData.rejection_reason = '';
+    }
 
-      const currentData = accountSnap.data() as TradingAccount;
-      if (currentData.status !== 'Pending') {
-        throw new Error(`لا يمكن تحديث الحساب. الحالة الحالية هي ${currentData.status}.`);
-      }
+    const { error: updateError } = await supabase
+      .from('trading_accounts')
+      .update(updateData)
+      .eq('id', accountId);
 
-      const updateData: { status: 'Approved' | 'Rejected'; rejectionReason?: string } = {
-        status,
-      };
-      let message = `تم ${status === 'Approved' ? 'الموافقة على' : 'رفض'} حساب التداول الخاص بك ${
-        currentData.accountNumber
-      }.`;
+    if (updateError) throw updateError;
 
-      if (status === 'Rejected') {
-        if (!reason) throw new Error('سبب الرفض مطلوب.');
-        updateData.rejectionReason = reason;
-        message += ` السبب: ${reason}`;
-      } else {
-        // Update user status to 'Active' if they were 'NEW'
-        const userRef = adminDb.collection('users').doc(currentData.userId);
-        const userSnap = await transaction.get(userRef);
-        if (userSnap.exists && userSnap.data()?.status === 'NEW') {
-          transaction.update(userRef, { status: 'Active' });
-        }
-        updateData.rejectionReason = '';
-      }
+    await createNotification(account.user_id, message, 'account', '/dashboard/my-accounts');
 
-      transaction.update(accountRef, updateData);
-      await createNotification(
-        transaction,
-        currentData.userId,
-        message,
-        'account',
-        '/dashboard/my-accounts'
-      );
-
-      return { success: true, message: `تم تحديث حالة الحساب إلى ${status}.` };
-    })
-    .catch((error) => {
-      console.error('Error updating account status:', error);
-      const errorMessage = error instanceof Error ? error.message : 'حدث خطأ غير معروف';
-      return { success: false, message: `فشل تحديث حالة الحساب: ${errorMessage}` };
-    });
+    return { success: true, message: `تم تحديث حالة الحساب إلى ${status}.` };
+  } catch (error) {
+    console.error('Error updating account status:', error);
+    const errorMessage = error instanceof Error ? error.message : 'حدث خطأ غير معروف';
+    return { success: false, message: `فشل تحديث حالة الحساب: ${errorMessage}` };
+  }
 }
 
 export async function adminAddTradingAccount(
@@ -101,44 +122,51 @@ export async function adminAddTradingAccount(
   accountNumber: string
 ) {
   try {
-    // Check for duplicate account first (outside transaction)
-    const existingAccountsSnap = await adminDb
-      .collection('tradingAccounts')
-      .where('broker', '==', brokerName)
-      .where('accountNumber', '==', accountNumber)
-      .get();
+    const supabase = await createAdminClient();
+    
+    const { data: existingAccounts } = await supabase
+      .from('trading_accounts')
+      .select('id')
+      .eq('broker', brokerName)
+      .eq('account_number', accountNumber);
 
-    if (!existingAccountsSnap.empty) {
+    if (existingAccounts && existingAccounts.length > 0) {
       throw new Error('رقم حساب التداول هذا مرتبط بالفعل لهذا الوسيط.');
     }
 
-    return await adminDb.runTransaction(async (transaction) => {
-      const newAccountRef = adminDb.collection('tradingAccounts').doc();
-      transaction.set(newAccountRef, {
-        userId: userId,
+    const { error: insertError } = await supabase
+      .from('trading_accounts')
+      .insert({
+        user_id: userId,
         broker: brokerName,
-        accountNumber: accountNumber,
+        account_number: accountNumber,
         status: 'Approved',
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        created_at: new Date().toISOString(),
       });
 
-      await createNotification(
-        transaction,
-        userId,
-        `تمت إضافة حسابك ${accountNumber} والموافقة عليه من قبل المسؤول.`,
-        'account',
-        '/dashboard/my-accounts'
-      );
+    if (insertError) throw insertError;
 
-      // Also set user status to Active if NEW
-      const userRef = adminDb.collection('users').doc(userId);
-      const userSnap = await transaction.get(userRef);
-      if (userSnap.exists && userSnap.data()?.status === 'NEW') {
-        transaction.update(userRef, { status: 'Active' });
-      }
+    await createNotification(
+      userId,
+      `تمت إضافة حسابك ${accountNumber} والموافقة عليه من قبل المسؤول.`,
+      'account',
+      '/dashboard/my-accounts'
+    );
 
-      return { success: true, message: 'تمت إضافة الحساب والموافقة عليه بنجاح.' };
-    });
+    const { data: user } = await supabase
+      .from('users')
+      .select('status')
+      .eq('id', userId)
+      .single();
+
+    if (user && user.status === 'NEW') {
+      await supabase
+        .from('users')
+        .update({ status: 'Active' })
+        .eq('id', userId);
+    }
+
+    return { success: true, message: 'تمت إضافة الحساب والموافقة عليه بنجاح.' };
   } catch (error) {
     console.error('Error adding trading account: ', error);
     const errorMessage = error instanceof Error ? error.message : 'حدث خطأ غير معروف';

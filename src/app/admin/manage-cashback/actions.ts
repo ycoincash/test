@@ -1,53 +1,78 @@
 'use server';
 
-import { adminDb } from '@/lib/firebase/admin-config';
-import * as admin from 'firebase-admin';
+import { createAdminClient } from '@/lib/supabase/server';
 import type { CashbackTransaction, UserProfile } from '@/types';
-import { createNotification, awardReferralCommission } from '../actions';
+import { awardReferralCommission } from '../actions';
 
-const safeToDate = (timestamp: any): Date | undefined => {
-  if (!timestamp) return undefined;
-  if (timestamp instanceof Date) return timestamp;
-  if (timestamp?._seconds) {
-    return new Date(timestamp._seconds * 1000);
+async function createNotification(
+  userId: string,
+  message: string,
+  type: 'account' | 'cashback' | 'withdrawal' | 'general' | 'store' | 'loyalty' | 'announcement',
+  link?: string
+) {
+  const supabase = await createAdminClient();
+  
+  const { error } = await supabase
+    .from('notifications')
+    .insert({
+      user_id: userId,
+      message,
+      type,
+      link,
+      is_read: false,
+      created_at: new Date().toISOString(),
+    });
+  
+  if (error) {
+    console.error('Error creating notification:', error);
   }
-  if (typeof timestamp?.toDate === 'function') {
-    return timestamp.toDate();
-  }
-  return undefined;
-};
+}
 
 export async function addCashbackTransaction(
   data: Omit<CashbackTransaction, 'id' | 'date'>
 ) {
   try {
-    // Step 1: Run the primary transaction for the user receiving cashback
-    await adminDb.runTransaction(async (transaction) => {
-      const newTransactionRef = adminDb.collection('cashbackTransactions').doc();
-      transaction.set(newTransactionRef, {
-        ...data,
-        date: admin.firestore.FieldValue.serverTimestamp(),
+    const supabase = await createAdminClient();
+    
+    const { error: insertError } = await supabase
+      .from('cashback_transactions')
+      .insert({
+        user_id: data.userId,
+        account_id: data.accountId,
+        account_number: data.accountNumber,
+        broker: data.broker,
+        date: new Date().toISOString(),
+        trade_details: data.tradeDetails,
+        cashback_amount: data.cashbackAmount,
       });
 
-      const userRef = adminDb.collection('users').doc(data.userId);
-      transaction.update(userRef, {
+    if (insertError) throw insertError;
+
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('monthly_earnings')
+      .eq('id', data.userId)
+      .single();
+
+    if (userError) throw userError;
+
+    const newMonthlyEarnings = (user.monthly_earnings || 0) + data.cashbackAmount;
+    
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({
         status: 'Trader',
-        monthlyEarnings: admin.firestore.FieldValue.increment(data.cashbackAmount),
-      });
+        monthly_earnings: newMonthlyEarnings,
+      })
+      .eq('id', data.userId);
 
-      const message = `لقد تلقيت ${data.cashbackAmount.toFixed(
-        2
-      )}$ كاش باك للحساب ${data.accountNumber}.`;
-      await createNotification(
-        transaction,
-        data.userId,
-        message,
-        'cashback',
-        '/dashboard/transactions'
-      );
-    });
+    if (updateError) throw updateError;
 
-    // Step 2: After the primary transaction succeeds, award commission in a separate operation
+    const message = `لقد تلقيت ${data.cashbackAmount.toFixed(
+      2
+    )}$ كاش باك للحساب ${data.accountNumber}.`;
+    await createNotification(data.userId, message, 'cashback', '/dashboard/transactions');
+
     await awardReferralCommission(data.userId, 'cashback', data.cashbackAmount);
 
     return { success: true, message: 'تمت إضافة معاملة الكاش باك بنجاح.' };
@@ -60,24 +85,30 @@ export async function addCashbackTransaction(
 export async function getCashbackHistory(): Promise<
   (CashbackTransaction & { userProfile?: Partial<UserProfile> })[]
 > {
-  const [transactionsSnap, usersSnap] = await Promise.all([
-    adminDb.collection('cashbackTransactions').orderBy('date', 'desc').get(),
-    adminDb.collection('users').get(),
+  const supabase = await createAdminClient();
+  
+  const [transactionsResult, usersResult] = await Promise.all([
+    supabase.from('cashback_transactions').select('*').order('date', { ascending: false }),
+    supabase.from('users').select('id, name, email, client_id'),
   ]);
 
   const usersMap = new Map(
-    usersSnap.docs.map((doc) => [doc.id, doc.data() as UserProfile])
+    (usersResult.data || []).map((user) => [user.id, user])
   );
 
-  return transactionsSnap.docs.map((doc) => {
-    const data = doc.data() as CashbackTransaction;
-    const userProfile = usersMap.get(data.userId);
+  return (transactionsResult.data || []).map((tx) => {
+    const user = usersMap.get(tx.user_id);
     return {
-      ...data,
-      id: doc.id,
-      date: safeToDate(data.date) || new Date(),
-      userProfile: userProfile
-        ? { name: userProfile.name, email: userProfile.email, clientId: userProfile.clientId }
+      id: tx.id,
+      userId: tx.user_id,
+      accountId: tx.account_id,
+      accountNumber: tx.account_number,
+      broker: tx.broker,
+      date: new Date(tx.date),
+      tradeDetails: tx.trade_details,
+      cashbackAmount: tx.cashback_amount,
+      userProfile: user
+        ? { name: user.name, email: user.email, clientId: user.client_id }
         : undefined,
     };
   });

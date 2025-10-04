@@ -1,16 +1,34 @@
-
-
 'use server';
 
-import { adminDb } from '@/lib/firebase/admin-config';
-import * as admin from 'firebase-admin';
+import { createAdminClient } from '@/lib/supabase/server';
 import type { Offer, UserProfile } from '@/types';
 import { getClientSessionInfo } from '@/lib/device-info';
 
 
 export async function addOffer(data: Omit<Offer, 'id'>) {
     try {
-        await adminDb.collection('offers').add( data);
+        const supabase = await createAdminClient();
+        
+        const { error } = await supabase
+            .from('offers')
+            .insert({
+                title: data.title,
+                description: data.description,
+                is_enabled: data.isEnabled,
+                type: data.type,
+                cta_text: data.ctaText,
+                cta_link: data.ctaLink,
+                script_code: data.scriptCode,
+                target_levels: data.targetLevels || [],
+                target_countries: data.targetCountries || [],
+                target_statuses: data.targetStatuses || [],
+            });
+
+        if (error) {
+            console.error("Error adding offer:", error);
+            return { success: false, message: 'فشل إضافة العرض.' };
+        }
+
         return { success: true, message: 'تمت إضافة العرض بنجاح.' };
     } catch (error) {
         console.error("Error adding offer:", error);
@@ -20,7 +38,30 @@ export async function addOffer(data: Omit<Offer, 'id'>) {
 
 export async function updateOffer(id: string, data: Partial<Omit<Offer, 'id'>>) {
     try {
-        await adminDb.collection('offers').doc(id).update( data);
+        const supabase = await createAdminClient();
+        
+        const updateData: any = {};
+        if (data.title !== undefined) updateData.title = data.title;
+        if (data.description !== undefined) updateData.description = data.description;
+        if (data.isEnabled !== undefined) updateData.is_enabled = data.isEnabled;
+        if (data.type !== undefined) updateData.type = data.type;
+        if (data.ctaText !== undefined) updateData.cta_text = data.ctaText;
+        if (data.ctaLink !== undefined) updateData.cta_link = data.ctaLink;
+        if (data.scriptCode !== undefined) updateData.script_code = data.scriptCode;
+        if (data.targetLevels !== undefined) updateData.target_levels = data.targetLevels;
+        if (data.targetCountries !== undefined) updateData.target_countries = data.targetCountries;
+        if (data.targetStatuses !== undefined) updateData.target_statuses = data.targetStatuses;
+
+        const { error } = await supabase
+            .from('offers')
+            .update(updateData)
+            .eq('id', id);
+
+        if (error) {
+            console.error("Error updating offer:", error);
+            return { success: false, message: 'فشل تحديث العرض.' };
+        }
+
         return { success: true, message: 'تم تحديث العرض بنجاح.' };
     } catch (error) {
         console.error("Error updating offer:", error);
@@ -30,7 +71,18 @@ export async function updateOffer(id: string, data: Partial<Omit<Offer, 'id'>>) 
 
 export async function deleteOffer(id: string) {
     try {
-        await adminDb.collection('offers').doc(id).delete();
+        const supabase = await createAdminClient();
+        
+        const { error } = await supabase
+            .from('offers')
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            console.error("Error deleting offer:", error);
+            return { success: false, message: 'فشل حذف العرض.' };
+        }
+
         return { success: true, message: 'تم حذف العرض بنجاح.' };
     } catch (error) {
         console.error("Error deleting offer:", error);
@@ -39,8 +91,30 @@ export async function deleteOffer(id: string) {
 }
 
 export async function getOffers(): Promise<Offer[]> {
-    const snapshot = await adminDb.collection('offers').get();
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Offer));
+    const supabase = await createAdminClient();
+    
+    const { data, error } = await supabase
+        .from('offers')
+        .select('*');
+
+    if (error) {
+        console.error("Error fetching offers:", error);
+        return [];
+    }
+
+    return (data || []).map(offer => ({
+        id: offer.id,
+        title: offer.title,
+        description: offer.description,
+        isEnabled: offer.is_enabled,
+        type: offer.type,
+        ctaText: offer.cta_text,
+        ctaLink: offer.cta_link,
+        scriptCode: offer.script_code,
+        targetLevels: offer.target_levels || [],
+        targetCountries: offer.target_countries || [],
+        targetStatuses: offer.target_statuses || [],
+    })) as Offer[];
 }
 
 export async function getOffersForUser(user: UserProfile | undefined): Promise<Offer[]> {
@@ -50,15 +124,34 @@ export async function getOffersForUser(user: UserProfile | undefined): Promise<O
         const { geoInfo } = await getClientSessionInfo();
         const userCountry = geoInfo.country;
 
-        const q = adminDb.collection('offers').where('isEnabled', '==', true);
-        const snapshot = await q.get();
+        const supabase = await createAdminClient();
         
-        const offers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Offer));
+        const { data, error } = await supabase
+            .from('offers')
+            .select('*')
+            .eq('is_enabled', true);
+
+        if (error) {
+            console.error("Error fetching offers:", error);
+            return [];
+        }
+        
+        const offers = (data || []).map(offer => ({
+            id: offer.id,
+            title: offer.title,
+            description: offer.description,
+            isEnabled: offer.is_enabled,
+            type: offer.type,
+            ctaText: offer.cta_text,
+            ctaLink: offer.cta_link,
+            scriptCode: offer.script_code,
+            targetLevels: offer.target_levels || [],
+            targetCountries: offer.target_countries || [],
+            targetStatuses: offer.target_statuses || [],
+        })) as Offer[];
 
         return offers.filter(offer => {
             const hasCountryTargeting = offer.targetCountries && offer.targetCountries.length > 0;
-            // If no country is targeted, it's a match.
-            // If countries are targeted, it's a match if the user's country is in the list OR if we don't know the user's country yet.
             const countryMatch = !hasCountryTargeting || (userCountry && offer.targetCountries!.includes(userCountry)) || !userCountry;
             
             const hasLevelTargeting = offer.targetLevels && offer.targetLevels.length > 0;

@@ -1,73 +1,95 @@
 'use server';
 
-import { adminDb } from '@/lib/firebase/admin-config';
-import * as admin from 'firebase-admin';
+import { createAdminClient } from '@/lib/supabase/server';
 import type { UserProfile, PendingVerification, KycData, AddressData } from '@/types';
-import { createNotification } from '../actions';
 
-const safeToDate = (timestamp: any): Date | undefined => {
-  if (!timestamp) return undefined;
-  if (timestamp instanceof Date) return timestamp;
-  if (timestamp?._seconds) {
-    return new Date(timestamp._seconds * 1000);
+async function createNotification(
+  userId: string,
+  message: string,
+  type: 'account' | 'cashback' | 'withdrawal' | 'general' | 'store' | 'loyalty' | 'announcement',
+  link?: string
+) {
+  const supabase = await createAdminClient();
+  
+  const { error } = await supabase
+    .from('notifications')
+    .insert({
+      user_id: userId,
+      message,
+      type,
+      link,
+      is_read: false,
+      created_at: new Date().toISOString(),
+    });
+  
+  if (error) {
+    console.error('Error creating notification:', error);
   }
-  if (typeof timestamp?.toDate === 'function') {
-    return timestamp.toDate();
-  }
-  return undefined;
-};
+}
 
 export async function getPendingVerifications(): Promise<PendingVerification[]> {
-  const usersSnapshot = await adminDb.collection('users').get();
+  const supabase = await createAdminClient();
+  
+  const { data: users, error } = await supabase
+    .from('users')
+    .select('*');
+
+  if (error) {
+    console.error('Error fetching users:', error);
+    return [];
+  }
+
   const pendingRequests: PendingVerification[] = [];
 
-  usersSnapshot.docs.forEach((doc) => {
-    const user = { uid: doc.id, ...doc.data() } as UserProfile;
-
-    // Check for pending KYC
-    if (user.kycData && user.kycData.status === 'Pending') {
+  users?.forEach((user) => {
+    if (user.kyc_status === 'Pending') {
       pendingRequests.push({
-        userId: user.uid,
+        userId: user.id,
         userName: user.name,
         userEmail: user.email,
         type: 'KYC',
-        requestedAt: safeToDate(user.kycData.submittedAt) || new Date(),
+        requestedAt: user.kyc_submitted_at ? new Date(user.kyc_submitted_at) : new Date(),
         data: {
-          ...user.kycData,
-          submittedAt: safeToDate(user.kycData.submittedAt) || new Date(),
+          documentType: user.kyc_document_type,
+          documentNumber: user.kyc_document_number,
+          gender: user.kyc_gender,
+          status: user.kyc_status,
+          submittedAt: user.kyc_submitted_at ? new Date(user.kyc_submitted_at) : new Date(),
+          rejectionReason: user.kyc_rejection_reason,
         },
       });
     }
 
-    // Check for pending Address
-    if (user.addressData && user.addressData.status === 'Pending') {
+    if (user.address_status === 'Pending') {
       pendingRequests.push({
-        userId: user.uid,
+        userId: user.id,
         userName: user.name,
         userEmail: user.email,
         type: 'Address',
-        requestedAt: safeToDate(user.addressData.submittedAt) || new Date(),
+        requestedAt: user.address_submitted_at ? new Date(user.address_submitted_at) : new Date(),
         data: {
-          ...user.addressData,
-          submittedAt: safeToDate(user.addressData.submittedAt) || new Date(),
+          country: user.address_country,
+          city: user.address_city,
+          streetAddress: user.address_street,
+          status: user.address_status,
+          submittedAt: user.address_submitted_at ? new Date(user.address_submitted_at) : new Date(),
+          rejectionReason: user.address_rejection_reason,
         },
       });
     }
 
-    // Check for pending Phone
-    if (user.phoneNumber && !user.phoneNumberVerified) {
+    if (user.phone_number && !user.phone_number_verified) {
       pendingRequests.push({
-        userId: user.uid,
+        userId: user.id,
         userName: user.name,
         userEmail: user.email,
         type: 'Phone',
-        requestedAt: new Date(), // Use current date as phone doesn't have a submission timestamp
-        data: { phoneNumber: user.phoneNumber },
+        requestedAt: new Date(),
+        data: { phoneNumber: user.phone_number },
       });
     }
   });
 
-  // Sort by most recent requests first
   pendingRequests.sort((a, b) => b.requestedAt.getTime() - a.requestedAt.getTime());
 
   return pendingRequests;
@@ -79,56 +101,54 @@ export async function updateVerificationStatus(
   status: 'Verified' | 'Rejected',
   reason?: string
 ) {
-  return adminDb
-    .runTransaction(async (transaction) => {
-      const userRef = adminDb.collection('users').doc(userId);
-      let updateData: Record<string, any> = {};
-      let notificationMessage = '';
-      let notificationLink = '/dashboard/settings/verification';
+  try {
+    const supabase = await createAdminClient();
+    let updateData: Record<string, any> = {};
+    let notificationMessage = '';
+    let notificationLink = '/dashboard/settings/verification';
 
-      if (type === 'kyc') {
-        updateData['kycData.status'] = status;
-        if (status === 'Rejected') {
-          if (!reason) throw new Error('Rejection reason is required.');
-          updateData['kycData.rejectionReason'] = reason;
-          notificationMessage = `تم رفض طلب التحقق من الهوية. السبب: ${reason}`;
-        } else {
-          notificationMessage = 'تم التحقق من هويتك بنجاح.';
-        }
-      } else if (type === 'address') {
-        updateData['addressData.status'] = status;
-        if (status === 'Rejected') {
-          if (!reason) throw new Error('Rejection reason is required.');
-          updateData['addressData.rejectionReason'] = reason;
-          notificationMessage = `تم رفض طلب التحقق من العنوان. السبب: ${reason}`;
-        } else {
-          notificationMessage = 'تم التحقق من عنوانك بنجاح.';
-        }
-      } else if (type === 'phone') {
-        if (status === 'Verified') {
-          updateData['phoneNumberVerified'] = true;
-          notificationMessage = 'تم التحقق من رقم هاتفك بنجاح.';
-        } else {
-          if (!reason) throw new Error('Rejection reason is required.');
-          updateData['phoneNumberVerified'] = false;
-          notificationMessage = `فشل التحقق من رقم هاتفك. السبب: ${reason}`;
-        }
+    if (type === 'kyc') {
+      updateData['kyc_status'] = status;
+      if (status === 'Rejected') {
+        if (!reason) throw new Error('Rejection reason is required.');
+        updateData['kyc_rejection_reason'] = reason;
+        notificationMessage = `تم رفض طلب التحقق من الهوية. السبب: ${reason}`;
+      } else {
+        notificationMessage = 'تم التحقق من هويتك بنجاح.';
       }
+    } else if (type === 'address') {
+      updateData['address_status'] = status;
+      if (status === 'Rejected') {
+        if (!reason) throw new Error('Rejection reason is required.');
+        updateData['address_rejection_reason'] = reason;
+        notificationMessage = `تم رفض طلب التحقق من العنوان. السبب: ${reason}`;
+      } else {
+        notificationMessage = 'تم التحقق من عنوانك بنجاح.';
+      }
+    } else if (type === 'phone') {
+      if (status === 'Verified') {
+        updateData['phone_number_verified'] = true;
+        notificationMessage = 'تم التحقق من رقم هاتفك بنجاح.';
+      } else {
+        if (!reason) throw new Error('Rejection reason is required.');
+        updateData['phone_number_verified'] = false;
+        notificationMessage = `فشل التحقق من رقم هاتفك. السبب: ${reason}`;
+      }
+    }
 
-      transaction.update(userRef, updateData);
-      await createNotification(
-        transaction,
-        userId,
-        notificationMessage,
-        'general',
-        notificationLink
-      );
+    const { error: updateError } = await supabase
+      .from('users')
+      .update(updateData)
+      .eq('id', userId);
 
-      return { success: true, message: `تم تحديث حالة التحقق بنجاح.` };
-    })
-    .catch((error) => {
-      console.error(`Error updating ${type} status for user ${userId}:`, error);
-      const errorMessage = error instanceof Error ? error.message : 'حدث خطأ غير معروف';
-      return { success: false, message: `فشل تحديث حالة التحقق: ${errorMessage}` };
-    });
+    if (updateError) throw updateError;
+
+    await createNotification(userId, notificationMessage, 'general', notificationLink);
+
+    return { success: true, message: `تم تحديث حالة التحقق بنجاح.` };
+  } catch (error) {
+    console.error(`Error updating ${type} status for user ${userId}:`, error);
+    const errorMessage = error instanceof Error ? error.message : 'حدث خطأ غير معروف';
+    return { success: false, message: `فشل تحديث حالة التحقق: ${errorMessage}` };
+  }
 }
