@@ -46,25 +46,37 @@ export async function getGeoFromHeaders(): Promise<{ country: string | null; ip:
         const headersList = await headers();
         const forwarded = headersList.get('x-forwarded-for');
         const realIp = headersList.get('x-real-ip');
+        const cfConnectingIp = headersList.get('cf-connecting-ip');
+        const trueClientIp = headersList.get('true-client-ip');
         
-        const ip = forwarded ? forwarded.split(',')[0].trim() : realIp || null;
+        console.log('Headers check:', { forwarded, realIp, cfConnectingIp, trueClientIp });
+        
+        const ip = cfConnectingIp || trueClientIp || (forwarded ? forwarded.split(',')[0].trim() : realIp) || null;
+        
+        console.log('Detected IP:', ip);
         
         if (!ip || ip === 'localhost' || ip === '127.0.0.1' || ip.startsWith('192.168.') || ip.startsWith('10.')) {
             console.log('Private/local IP detected, skipping geo lookup');
-            return { country: null, ip: null, city: null };
+            return { country: null, ip, city: null };
         }
 
         const token = process.env.IPINFO_TOKEN;
+        console.log('IPINFO_TOKEN exists:', !!token);
         
         if (token) {
             try {
-                const response = await fetch(`https://ipinfo.io/${ip}?token=${token}`, {
+                const url = `https://ipinfo.io/${ip}?token=${token}`;
+                console.log('Fetching from IPinfo:', url.replace(token, '***'));
+                
+                const response = await fetch(url, {
                     next: { revalidate: 3600 }
                 });
                 
+                console.log('IPinfo response status:', response.status);
+                
                 if (response.ok) {
                     const data = await response.json();
-                    console.log('IPinfo data:', { ip, country: data.country, city: data.city, region: data.region });
+                    console.log('IPinfo SUCCESS:', { ip, country: data.country, city: data.city, region: data.region });
                     
                     const country = data.country?.toUpperCase() || null;
                     const city = data.city || null;
@@ -75,10 +87,15 @@ export async function getGeoFromHeaders(): Promise<{ country: string | null; ip:
                         region: data.region || undefined,
                         ip: data.ip || ip
                     };
+                } else {
+                    const errorText = await response.text();
+                    console.error('IPinfo API error:', response.status, errorText);
                 }
             } catch (err) {
                 console.error('IPinfo fetch error:', err);
             }
+        } else {
+            console.log('No IPINFO_TOKEN available, trying fallback');
         }
         
         try {
