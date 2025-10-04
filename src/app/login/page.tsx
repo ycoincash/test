@@ -58,8 +58,20 @@ export default function LoginPage() {
     // Small delay to let session propagate
     await new Promise(resolve => setTimeout(resolve, 100));
 
-    // Redirect to dashboard
-    router.push('/dashboard');
+    // Fetch user profile to check role
+    const supabase = createClient();
+    const { data: profile } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', userId)
+      .single();
+
+    // Redirect based on role
+    if (profile?.role === 'admin') {
+      router.push('/admin/dashboard');
+    } else {
+      router.push('/dashboard');
+    }
   }
 
   const handleEmailLogin = async (e: React.FormEvent) => {
