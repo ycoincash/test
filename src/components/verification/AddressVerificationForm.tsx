@@ -275,7 +275,6 @@ export function AddressVerificationForm({ onSuccess, onCancel, userCountry }: Ad
                             className="hidden"
                             accept="image/*,application/pdf"
                             onChange={(e) => handleFileChange(e.target.files?.[0])}
-                            {...field}
                           />
                         </label>
                         {documentPreview && (

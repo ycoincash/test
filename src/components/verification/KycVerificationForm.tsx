@@ -283,7 +283,6 @@ export function KycVerificationForm({ onSuccess, onCancel, userCountry }: KycVer
                           onChange={(e) => handleFileChange(e.target.files?.[0], 'documentFrontFile')}
                           className="hidden"
                           id="front-upload"
-                          {...field}
                         />
                         <label
                           htmlFor="front-upload"
@@ -344,7 +343,6 @@ export function KycVerificationForm({ onSuccess, onCancel, userCountry }: KycVer
                             onChange={(e) => handleFileChange(e.target.files?.[0], 'documentBackFile')}
                             className="hidden"
                             id="back-upload"
-                            {...field}
                           />
                           <label
                             htmlFor="back-upload"
