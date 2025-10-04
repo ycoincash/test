@@ -97,82 +97,46 @@ export function KycVerificationForm({ onSuccess, onCancel, userCountry }: KycVer
     
     setIsSubmitting(true);
     try {
-      console.log('📤 Uploading front document with pre-signed URL...');
+      console.log('📤 Creating FormData for front document...');
+      const frontFormData = new FormData();
+      frontFormData.append('file', data.documentFrontFile);
+      frontFormData.append('documentType', 'kyc_front');
       
-      // Step 1: Get pre-signed upload URL
-      const frontUrlResponse = await fetch('/api/upload-url', {
+      console.log('📤 Calling upload API for front document...');
+      const frontResponse = await fetch('/api/upload', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fileName: data.documentFrontFile.name,
-          fileType: data.documentFrontFile.type,
-          documentType: 'kyc_front',
-        }),
+        body: frontFormData,
       });
-      
-      if (!frontUrlResponse.ok) {
-        const error = await frontUrlResponse.json();
-        throw new Error(error.error || 'فشل إنشاء رابط الرفع');
+      const frontResult = await frontResponse.json();
+      console.log('📤 Front upload result:', frontResult);
+
+      if (!frontResult.success) {
+        console.error('❌ Front upload failed:', frontResult.error);
+        throw new Error(frontResult.error || 'فشل رفع الوثيقة الأمامية');
       }
       
-      const { uploadUrl: frontUploadUrl, fileUrl: frontFileUrl } = await frontUrlResponse.json();
-      console.log('🔑 Got pre-signed URL for front document');
-      
-      // Step 2: Upload directly to storage
-      const frontUploadResponse = await fetch(frontUploadUrl, {
-        method: 'PUT',
-        body: data.documentFrontFile,
-        headers: {
-          'Content-Type': data.documentFrontFile.type,
-        },
-      });
-      
-      if (!frontUploadResponse.ok) {
-        console.error('❌ Front upload failed:', frontUploadResponse.status);
-        throw new Error('فشل رفع الوثيقة الأمامية');
-      }
-      
-      console.log('✅ Front upload successful:', frontFileUrl);
-      const frontResult = { success: true, url: frontFileUrl };
+      console.log('✅ Front upload successful:', frontResult.url);
 
       let backUrl: string | undefined;
       if (data.documentBackFile) {
-        console.log('📤 Uploading back document with pre-signed URL...');
+        console.log('📤 Creating FormData for back document...');
+        const backFormData = new FormData();
+        backFormData.append('file', data.documentBackFile);
+        backFormData.append('documentType', 'kyc_back');
         
-        // Step 1: Get pre-signed upload URL
-        const backUrlResponse = await fetch('/api/upload-url', {
+        console.log('📤 Calling upload API for back document...');
+        const backResponse = await fetch('/api/upload', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fileName: data.documentBackFile.name,
-            fileType: data.documentBackFile.type,
-            documentType: 'kyc_back',
-          }),
+          body: backFormData,
         });
+        const backResult = await backResponse.json();
+        console.log('📤 Back upload result:', backResult);
         
-        if (!backUrlResponse.ok) {
-          const error = await backUrlResponse.json();
-          throw new Error(error.error || 'فشل إنشاء رابط الرفع');
+        if (!backResult.success) {
+          console.error('❌ Back upload failed:', backResult.error);
+          throw new Error(backResult.error || 'فشل رفع الوثيقة الخلفية');
         }
-        
-        const { uploadUrl: backUploadUrl, fileUrl: backFileUrl } = await backUrlResponse.json();
-        console.log('🔑 Got pre-signed URL for back document');
-        
-        // Step 2: Upload directly to storage
-        const backUploadResponse = await fetch(backUploadUrl, {
-          method: 'PUT',
-          body: data.documentBackFile,
-          headers: {
-            'Content-Type': data.documentBackFile.type,
-          },
-        });
-        
-        if (!backUploadResponse.ok) {
-          console.error('❌ Back upload failed:', backUploadResponse.status);
-          throw new Error('فشل رفع الوثيقة الخلفية');
-        }
-        
-        backUrl = backFileUrl;
+        backUrl = backResult.url;
         console.log('✅ Back upload successful:', backUrl);
       }
 

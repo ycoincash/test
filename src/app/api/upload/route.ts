@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { uploadDocument, validateDocumentFile } from '@/lib/storage';
 
-export const runtime = 'nodejs';
-
 export async function POST(request: NextRequest) {
   try {
     console.log('📥 API Upload route called');
