@@ -76,7 +76,16 @@ export default function LoginPage() {
         throw error;
       }
 
-      if (data.user) {
+      if (data.user && data.session) {
+        await fetch('/auth/sync-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            access_token: data.session.access_token,
+            refresh_token: data.session.refresh_token,
+          }),
+        });
+
         await handleLoginSuccess(data.user.id);
       }
     } catch (error: any) {
