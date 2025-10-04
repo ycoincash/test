@@ -43,7 +43,7 @@ export async function getBrokers(): Promise<Broker[]> {
     return [];
   }
 
-  return data as Broker[];
+  return (data || []) as Broker[];
 }
 
 export async function addBroker(data: Omit<Broker, 'id' | 'order'>) {
