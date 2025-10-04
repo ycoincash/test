@@ -58,11 +58,18 @@ export function KycVerificationForm({ onSuccess, onCancel, userCountry }: KycVer
   const nationality = form.watch('nationality');
 
   const handleFileChange = (
-    file: File | undefined,
+    e: React.ChangeEvent<HTMLInputElement>,
     field: 'documentFrontFile' | 'documentBackFile' | 'selfieFile'
   ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const file = e.target.files?.[0];
     console.log('📁 File changed:', field, file?.name, file?.size);
-    if (file) {
+    
+    if (!file) return;
+    
+    try {
       const reader = new FileReader();
       reader.onloadend = () => {
         if (field === 'documentFrontFile') {
@@ -74,8 +81,10 @@ export function KycVerificationForm({ onSuccess, onCancel, userCountry }: KycVer
         }
       };
       reader.readAsDataURL(file);
-      form.setValue(field, file, { shouldValidate: true });
+      form.setValue(field, file, { shouldValidate: false });
       console.log('✅ File set in form:', field);
+    } catch (error) {
+      console.error('❌ Error handling file:', error);
     }
   };
 
@@ -366,12 +375,14 @@ export function KycVerificationForm({ onSuccess, onCancel, userCountry }: KycVer
                         <input
                           type="file"
                           accept="image/jpeg,image/png,image/heic,image/webp,application/pdf"
-                          onChange={(e) => handleFileChange(e.target.files?.[0], 'documentFrontFile')}
+                          onChange={(e) => handleFileChange(e, 'documentFrontFile')}
+                          onClick={(e) => e.stopPropagation()}
                           className="hidden"
                           id="front-upload"
                         />
                         <label
                           htmlFor="front-upload"
+                          onClick={(e) => e.stopPropagation()}
                           className={`block border-2 border-dashed rounded-lg p-6 cursor-pointer transition-colors ${
                             frontPreview ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
                           }`}
@@ -426,7 +437,8 @@ export function KycVerificationForm({ onSuccess, onCancel, userCountry }: KycVer
                           <input
                             type="file"
                             accept="image/jpeg,image/png,image/heic,image/webp,application/pdf"
-                            onChange={(e) => handleFileChange(e.target.files?.[0], 'documentBackFile')}
+                            onChange={(e) => handleFileChange(e, 'documentBackFile')}
+                            onClick={(e) => e.stopPropagation()}
                             className="hidden"
                             id="back-upload"
                           />
@@ -486,7 +498,8 @@ export function KycVerificationForm({ onSuccess, onCancel, userCountry }: KycVer
                         <input
                           type="file"
                           accept="image/jpeg,image/png,image/heic,image/webp"
-                          onChange={(e) => handleFileChange(e.target.files?.[0], 'selfieFile')}
+                          onChange={(e) => handleFileChange(e, 'selfieFile')}
+                          onClick={(e) => e.stopPropagation()}
                           className="hidden"
                           id="selfie-upload"
                         />
