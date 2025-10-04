@@ -17,6 +17,7 @@ export async function POST(request: Request) {
       streetAddress,
       stateProvince,
       postalCode,
+      documentType,
       documentUrl,
     } = body;
 

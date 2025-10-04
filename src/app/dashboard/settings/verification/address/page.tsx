@@ -4,7 +4,7 @@ import { useAuthContext } from "@/hooks/useAuthContext";
 import { useRouter } from "next/navigation";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { AddressVerificationForm } from "@/components/verification/AddressVerificationForm";
+import { AddressSimpleUpload } from "@/components/verification/AddressSimpleUpload";
 import { PageHeader } from "@/components/shared/PageHeader";
 
 export default function AddressVerificationPage() {
@@ -44,10 +44,9 @@ export default function AddressVerificationPage() {
                 description="قم برفع مستند رسمي يثبت عنوان إقامتك"
             />
 
-            <AddressVerificationForm
+            <AddressSimpleUpload
                 onSuccess={handleSuccess}
                 onCancel={handleCancel}
-                userCountry={user.profile.country}
             />
         </div>
     );
