@@ -270,7 +270,7 @@ export async function submitFeedbackResponse(
                 form_id: formId,
                 user_id: userId,
                 submitted_at: new Date().toISOString(),
-                answers,
+                responses: answers,
             });
 
         if (insertError) {
@@ -933,7 +933,7 @@ export async function getEnabledOffers() {
     const { data, error } = await supabase
         .from('offers')
         .select('*')
-        .eq('is_active', true);
+        .eq('is_enabled', true);
     
     if (error) {
         console.error("Error fetching offers:", error);
