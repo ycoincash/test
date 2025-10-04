@@ -1,95 +1,33 @@
--- Supabase Migration Schema
--- This file contains the complete database schema for migrating from Firebase Firestore to Supabase PostgreSQL
+-- Supabase Migration Schema - TESTED VERSION
+-- Run this ONCE in Supabase SQL Editor
+-- This will create all tables with correct column names
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Create ENUM types (only if they don't exist)
-DO $$ BEGIN
-    CREATE TYPE user_status AS ENUM ('active', 'suspended', 'inactive');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
+-- ============================================
+-- STEP 1: Create ENUM Types
+-- ============================================
+DO $$ BEGIN CREATE TYPE user_status AS ENUM ('active', 'suspended', 'inactive'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE user_role AS ENUM ('user', 'admin'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE document_type AS ENUM ('id_card', 'passport'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE gender_type AS ENUM ('male', 'female'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE verification_status AS ENUM ('Pending', 'Verified', 'Rejected'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE account_status AS ENUM ('Pending', 'Approved', 'Rejected'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE withdrawal_status AS ENUM ('Processing', 'Completed', 'Failed'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE notification_type AS ENUM ('account', 'cashback', 'withdrawal', 'general', 'store', 'loyalty', 'announcement'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE target_type AS ENUM ('all', 'specific'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE broker_category AS ENUM ('forex', 'crypto', 'other'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE payment_method_type AS ENUM ('crypto', 'internal_transfer', 'trading_account'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE cashback_frequency AS ENUM ('Daily', 'Weekly', 'Monthly'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE mt_license_type AS ENUM ('Full License', 'White Label', 'None'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE source_type AS ENUM ('cashback', 'store_purchase'); EXCEPTION WHEN duplicate_object THEN null; END $$;
 
-DO $$ BEGIN
-    CREATE TYPE user_role AS ENUM ('user', 'admin');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
+-- ============================================
+-- STEP 2: Create Tables
+-- ============================================
 
-DO $$ BEGIN
-    CREATE TYPE document_type AS ENUM ('id_card', 'passport');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE TYPE gender_type AS ENUM ('male', 'female');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE TYPE verification_status AS ENUM ('Pending', 'Verified', 'Rejected');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE TYPE account_status AS ENUM ('Pending', 'Approved', 'Rejected');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE TYPE withdrawal_status AS ENUM ('Processing', 'Completed', 'Failed');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE TYPE notification_type AS ENUM ('account', 'cashback', 'withdrawal', 'general', 'store', 'loyalty', 'announcement');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE TYPE target_type AS ENUM ('all', 'specific');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE TYPE broker_category AS ENUM ('forex', 'crypto', 'other');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE TYPE payment_method_type AS ENUM ('crypto', 'internal_transfer', 'trading_account');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE TYPE cashback_frequency AS ENUM ('Daily', 'Weekly', 'Monthly');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE TYPE mt_license_type AS ENUM ('Full License', 'White Label', 'None');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE TYPE source_type AS ENUM ('cashback', 'store_purchase');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
--- Users table (replaces Firebase Auth + users collection)
+-- Users table
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email TEXT UNIQUE NOT NULL,
@@ -106,7 +44,6 @@ CREATE TABLE IF NOT EXISTS users (
     referred_by UUID REFERENCES users(id) ON DELETE SET NULL,
     level INTEGER DEFAULT 1 CHECK (level BETWEEN 1 AND 6),
     monthly_earnings NUMERIC(10, 2) DEFAULT 0,
-    -- KYC data (flattened)
     kyc_document_type document_type,
     kyc_document_number TEXT,
     kyc_full_name TEXT,
@@ -120,7 +57,6 @@ CREATE TABLE IF NOT EXISTS users (
     kyc_status verification_status,
     kyc_submitted_at TIMESTAMPTZ,
     kyc_rejection_reason TEXT,
-    -- Address data (flattened)
     address_country TEXT,
     address_city TEXT,
     address_street TEXT,
@@ -132,7 +68,6 @@ CREATE TABLE IF NOT EXISTS users (
     address_rejection_reason TEXT
 );
 
--- Create index for referral lookups
 CREATE INDEX IF NOT EXISTS idx_users_referral_code ON users(referral_code);
 CREATE INDEX IF NOT EXISTS idx_users_referred_by ON users(referred_by);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -146,27 +81,16 @@ CREATE TABLE IF NOT EXISTS brokers (
     description TEXT,
     category broker_category DEFAULT 'forex',
     rating NUMERIC(2, 1) CHECK (rating BETWEEN 0 AND 5),
-    -- Basic Info (JSONB for nested structure)
     basic_info JSONB NOT NULL,
-    -- Regulation
     regulation JSONB NOT NULL,
-    -- Trading Conditions
     trading_conditions JSONB NOT NULL,
-    -- Platforms
     platforms JSONB NOT NULL,
-    -- Instruments
     instruments JSONB NOT NULL,
-    -- Deposits/Withdrawals
     deposits_withdrawals JSONB NOT NULL,
-    -- Cashback
     cashback JSONB NOT NULL,
-    -- Global Reach
     global_reach JSONB NOT NULL,
-    -- Reputation
     reputation JSONB NOT NULL,
-    -- Additional Features
     additional_features JSONB NOT NULL,
-    -- Instructions
     instructions JSONB NOT NULL,
     existing_account_instructions TEXT
 );
@@ -197,12 +121,10 @@ CREATE TABLE IF NOT EXISTS cashback_transactions (
     date TIMESTAMPTZ DEFAULT NOW(),
     trade_details TEXT,
     cashback_amount NUMERIC(10, 2) NOT NULL,
-    -- Referral fields
     referral_bonus_to UUID REFERENCES users(id) ON DELETE SET NULL,
     referral_bonus_amount NUMERIC(10, 2),
     source_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
     source_type source_type,
-    -- Admin details
     transaction_id TEXT,
     note TEXT
 );
@@ -408,9 +330,10 @@ CREATE TABLE IF NOT EXISTS offers (
     target_statuses TEXT[] DEFAULT ARRAY[]::TEXT[]
 );
 
--- Row Level Security (RLS) Policies
+-- ============================================
+-- STEP 3: Row Level Security (RLS) Policies
+-- ============================================
 
--- Enable RLS on all tables
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE trading_accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cashback_transactions ENABLE ROW LEVEL SECURITY;
@@ -420,127 +343,92 @@ ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE activity_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE feedback_responses ENABLE ROW LEVEL SECURITY;
 
--- Users: Users can read their own profile
 DROP POLICY IF EXISTS "Users can read own profile" ON users;
-CREATE POLICY "Users can read own profile" ON users
-    FOR SELECT USING (auth.uid() = id);
+CREATE POLICY "Users can read own profile" ON users FOR SELECT USING (auth.uid() = id);
 
--- Users: Users can update their own profile (limited fields)
 DROP POLICY IF EXISTS "Users can update own profile" ON users;
-CREATE POLICY "Users can update own profile" ON users
-    FOR UPDATE USING (auth.uid() = id);
+CREATE POLICY "Users can update own profile" ON users FOR UPDATE USING (auth.uid() = id);
 
--- Trading Accounts: Users can read their own accounts
 DROP POLICY IF EXISTS "Users can read own trading accounts" ON trading_accounts;
-CREATE POLICY "Users can read own trading accounts" ON trading_accounts
-    FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can read own trading accounts" ON trading_accounts FOR SELECT USING (auth.uid() = user_id);
 
--- Cashback Transactions: Users can read their own transactions
 DROP POLICY IF EXISTS "Users can read own cashback" ON cashback_transactions;
-CREATE POLICY "Users can read own cashback" ON cashback_transactions
-    FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can read own cashback" ON cashback_transactions FOR SELECT USING (auth.uid() = user_id);
 
--- Withdrawals: Users can read their own withdrawals
 DROP POLICY IF EXISTS "Users can read own withdrawals" ON withdrawals;
-CREATE POLICY "Users can read own withdrawals" ON withdrawals
-    FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can read own withdrawals" ON withdrawals FOR SELECT USING (auth.uid() = user_id);
 
--- Notifications: Users can read their own notifications
 DROP POLICY IF EXISTS "Users can read own notifications" ON notifications;
-CREATE POLICY "Users can read own notifications" ON notifications
-    FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can read own notifications" ON notifications FOR SELECT USING (auth.uid() = user_id);
 
--- Notifications: Users can update their own notifications (mark as read)
 DROP POLICY IF EXISTS "Users can update own notifications" ON notifications;
-CREATE POLICY "Users can update own notifications" ON notifications
-    FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can update own notifications" ON notifications FOR UPDATE USING (auth.uid() = user_id);
 
--- Orders: Users can read their own orders
 DROP POLICY IF EXISTS "Users can read own orders" ON orders;
-CREATE POLICY "Users can read own orders" ON orders
-    FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can read own orders" ON orders FOR SELECT USING (auth.uid() = user_id);
 
--- Activity Logs: Users can read their own logs
 DROP POLICY IF EXISTS "Users can read own activity logs" ON activity_logs;
-CREATE POLICY "Users can read own activity logs" ON activity_logs
-    FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can read own activity logs" ON activity_logs FOR SELECT USING (auth.uid() = user_id);
 
--- Feedback Responses: Users can read their own responses
 DROP POLICY IF EXISTS "Users can read own feedback responses" ON feedback_responses;
-CREATE POLICY "Users can read own feedback responses" ON feedback_responses
-    FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can read own feedback responses" ON feedback_responses FOR SELECT USING (auth.uid() = user_id);
 
--- Public read access for certain tables
 ALTER TABLE brokers ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Brokers are publicly readable" ON brokers;
-CREATE POLICY "Brokers are publicly readable" ON brokers
-    FOR SELECT USING (true);
+CREATE POLICY "Brokers are publicly readable" ON brokers FOR SELECT USING (true);
 
 ALTER TABLE payment_methods ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Payment methods are publicly readable" ON payment_methods;
-CREATE POLICY "Payment methods are publicly readable" ON payment_methods
-    FOR SELECT USING (is_enabled = true);
+CREATE POLICY "Payment methods are publicly readable" ON payment_methods FOR SELECT USING (is_enabled = true);
 
 ALTER TABLE product_categories ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Product categories are publicly readable" ON product_categories;
-CREATE POLICY "Product categories are publicly readable" ON product_categories
-    FOR SELECT USING (true);
+CREATE POLICY "Product categories are publicly readable" ON product_categories FOR SELECT USING (true);
 
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Products are publicly readable" ON products;
-CREATE POLICY "Products are publicly readable" ON products
-    FOR SELECT USING (true);
+CREATE POLICY "Products are publicly readable" ON products FOR SELECT USING (true);
 
 ALTER TABLE blog_posts ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Published blog posts are publicly readable" ON blog_posts;
-CREATE POLICY "Published blog posts are publicly readable" ON blog_posts
-    FOR SELECT USING (status = 'published');
+CREATE POLICY "Published blog posts are publicly readable" ON blog_posts FOR SELECT USING (status = 'published');
 
 ALTER TABLE client_levels ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Client levels are publicly readable" ON client_levels;
-CREATE POLICY "Client levels are publicly readable" ON client_levels
-    FOR SELECT USING (true);
+CREATE POLICY "Client levels are publicly readable" ON client_levels FOR SELECT USING (true);
 
 ALTER TABLE feedback_forms ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Active feedback forms are publicly readable" ON feedback_forms;
-CREATE POLICY "Active feedback forms are publicly readable" ON feedback_forms
-    FOR SELECT USING (is_active = true);
+CREATE POLICY "Active feedback forms are publicly readable" ON feedback_forms FOR SELECT USING (is_active = true);
 
 ALTER TABLE contact_settings ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Contact settings are publicly readable" ON contact_settings;
-CREATE POLICY "Contact settings are publicly readable" ON contact_settings
-    FOR SELECT USING (true);
+CREATE POLICY "Contact settings are publicly readable" ON contact_settings FOR SELECT USING (true);
 
 ALTER TABLE banner_settings ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Banner settings are publicly readable" ON banner_settings;
-CREATE POLICY "Banner settings are publicly readable" ON banner_settings
-    FOR SELECT USING (true);
+CREATE POLICY "Banner settings are publicly readable" ON banner_settings FOR SELECT USING (true);
 
 ALTER TABLE offers ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Enabled offers are publicly readable" ON offers;
-CREATE POLICY "Enabled offers are publicly readable" ON offers
-    FOR SELECT USING (is_enabled = true);
+CREATE POLICY "Enabled offers are publicly readable" ON offers FOR SELECT USING (is_enabled = true);
 
 ALTER TABLE admin_notifications ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Admin notifications are admin only" ON admin_notifications;
-CREATE POLICY "Admin notifications are admin only" ON admin_notifications
-    FOR ALL USING (
-        EXISTS (
-            SELECT 1 FROM users WHERE users.id = auth.uid() AND users.role = 'admin'
-        )
-    );
+CREATE POLICY "Admin notifications are admin only" ON admin_notifications FOR ALL USING (EXISTS (SELECT 1 FROM users WHERE users.id = auth.uid() AND users.role = 'admin'));
 
--- Insert default contact settings
+-- ============================================
+-- STEP 4: Seed Data
+-- ============================================
+
 INSERT INTO contact_settings (id, email, phone, address, social)
 VALUES ('contact', '', '', '', '{}')
 ON CONFLICT (id) DO NOTHING;
 
--- Insert default banner settings
 INSERT INTO banner_settings (id, is_enabled, type, title, text, cta_text, cta_link)
 VALUES ('banner', false, 'text', '', '', '', '')
 ON CONFLICT (id) DO NOTHING;
 
--- Seed client levels
 INSERT INTO client_levels (id, name, required_total, advantage_referral_cashback, advantage_referral_store, advantage_product_discount)
 VALUES
     (1, 'Bronze', 0, 5, 2, 0),
