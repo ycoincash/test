@@ -20,6 +20,7 @@ import { Loader2, Mail, Lock } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { handleForgotPassword } from '../actions';
+import { logLoginActivity } from './actions';
 
 
 const GoogleIcon = () => (
@@ -45,6 +46,9 @@ export default function LoginPage() {
   const handleLoginSuccess = async (userId: string) => {
     // Trigger user data refetch
     window.dispatchEvent(new CustomEvent('refetchUser'));
+
+    // Log login activity
+    await logLoginActivity(userId);
 
     toast({
       type: "success",
