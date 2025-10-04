@@ -63,6 +63,28 @@ The following environment variables must be configured in Replit Secrets:
 - **Run Command:** `npm start`
 
 ### Recent Changes
+- **2025-10-04:** Broker Form Redesign with Modern Best Practices
+  - Implemented multi-step wizard architecture with 11 comprehensive steps:
+    1. Basic Information (broker details, company info)
+    2. Regulation & Licensing (regulatory status, licenses)
+    3. Trading Conditions (spreads, leverage, account types)
+    4. Platforms & Tools (MT4/MT5, mobile apps, demo accounts)
+    5. Trading Instruments (forex, crypto, stocks, commodities, indices)
+    6. Deposits & Withdrawals (payment methods, withdrawal policies)
+    7. Cashback & Rewards (cashback programs, terms)
+    8. Global Reach (regions, languages, customer support)
+    9. Reputation & Reviews (WikiFX, Trustpilot scores)
+    10. Additional Features (swap-free, education center, bonuses)
+    11. Instructions & Links (account setup, existing account links)
+  - Built modular step components with proper separation of concerns
+  - Implemented responsive mobile-first design (desktop sidebar stepper, mobile top progress bar)
+  - Added autosave functionality with 3-second debouncing and localStorage persistence
+  - Integrated real-time validation with React Hook Form + Zod schemas
+  - Ensured accessibility with Radix UI primitives (ARIA labels, keyboard navigation)
+  - Full RTL/LTR support for Arabic/English languages
+  - Proper data transformation: form → camelCase → snake_case → PostgreSQL
+  - Production-ready with comprehensive validation and error handling
+
 - **2025-10-04:** Complete Firebase to Supabase migration
   - Migrated from Firebase Auth to Supabase Auth with SSR support
   - Migrated from Firestore to PostgreSQL with 19 tables
