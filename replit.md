@@ -39,3 +39,43 @@ The platform is built with Next.js 15.3.3 and Turbopack, using TypeScript and st
 - **Google Genkit:** AI integration.
 - **IPinfo.io / ipapi.co:** Geo-location services (server-side with `IPINFO_TOKEN`).
 - **next-firebase-auth-edge:** For secure cookie-based authentication.
+
+## Replit Environment Setup
+
+### Development Server
+- **Workflow:** "Server" running `npm run dev`
+- **Port:** 5000 (configured to bind to 0.0.0.0)
+- **Host Configuration:** Next.js configured with `allowedDevOrigins: ['*.replit.dev']` to work with Replit's proxy
+
+### Required Environment Variables
+The following environment variables must be configured in Replit Secrets:
+
+**Firebase Client Configuration (NEXT_PUBLIC_*):**
+- `NEXT_PUBLIC_FIREBASE_API_KEY`
+- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
+- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+- `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
+- `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
+- `NEXT_PUBLIC_FIREBASE_APP_ID`
+- `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID`
+
+**Firebase Admin SDK:**
+- `FIREBASE_SERVICE_ACCOUNT_KEY_B64` - Base64 encoded Firebase service account JSON key
+
+**Authentication & Security:**
+- `COOKIE_SIGNATURE_KEYS` - JSON array of signing keys (e.g., `["secret-key-1","secret-key-2"]`)
+
+**Optional Services:**
+- `IPINFO_TOKEN` - IPinfo.io API token for geo-location services
+
+### Deployment Configuration
+- **Target:** Autoscale (stateless web application)
+- **Build Command:** `npm run build`
+- **Run Command:** `npm start`
+
+### Recent Changes
+- **2025-10-04:** Initial Replit environment setup completed
+  - Installed npm dependencies
+  - Configured development workflow on port 5000
+  - Set up deployment configuration for production
+  - Verified Next.js host configuration for Replit proxy compatibility
