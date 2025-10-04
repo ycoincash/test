@@ -246,17 +246,14 @@ CREATE TABLE IF NOT EXISTS blog_posts (
     slug TEXT UNIQUE NOT NULL,
     content TEXT NOT NULL,
     excerpt TEXT,
-    image_url TEXT,
-    author_name TEXT NOT NULL,
-    author_id TEXT NOT NULL,
-    status TEXT DEFAULT 'draft' CHECK (status IN ('draft', 'published')),
-    tags TEXT[] DEFAULT ARRAY[]::TEXT[],
+    author TEXT NOT NULL,
+    is_published BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_blog_posts_slug ON blog_posts(slug);
-CREATE INDEX IF NOT EXISTS idx_blog_posts_status ON blog_posts(status);
+CREATE INDEX IF NOT EXISTS idx_blog_posts_is_published ON blog_posts(is_published);
 
 -- Client Levels table
 CREATE TABLE IF NOT EXISTS client_levels (
@@ -331,36 +328,10 @@ CREATE TABLE IF NOT EXISTS offers (
 );
 
 -- ============================================
--- STEP 2.5: Migrate Existing Database Schema
+-- STEP 2.5: Ensure All Columns Exist
 -- ============================================
 
--- Migrate blog_posts from old structure to new structure
-DO $$ 
-BEGIN
-    -- Add status column (migrate from is_published)
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='blog_posts' AND column_name='status') THEN
-        ALTER TABLE blog_posts ADD COLUMN status TEXT;
-        UPDATE blog_posts SET status = CASE WHEN is_published = true THEN 'published' ELSE 'draft' END;
-        ALTER TABLE blog_posts ALTER COLUMN status SET DEFAULT 'draft';
-        ALTER TABLE blog_posts ADD CONSTRAINT blog_posts_status_check CHECK (status IN ('draft', 'published'));
-    END IF;
-    
-    -- Add author_name and author_id (migrate from author)
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='blog_posts' AND column_name='author_name') THEN
-        ALTER TABLE blog_posts ADD COLUMN author_name TEXT;
-        ALTER TABLE blog_posts ADD COLUMN author_id TEXT;
-        UPDATE blog_posts SET author_name = COALESCE(author, 'Admin'), author_id = 'migrated';
-        ALTER TABLE blog_posts ALTER COLUMN author_name SET NOT NULL;
-        ALTER TABLE blog_posts ALTER COLUMN author_id SET NOT NULL;
-    END IF;
-    
-    -- Add tags array
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='blog_posts' AND column_name='tags') THEN
-        ALTER TABLE blog_posts ADD COLUMN tags TEXT[] DEFAULT ARRAY[]::TEXT[];
-    END IF;
-END $$;
-
--- Add missing columns to other tables
+-- Add missing columns to tables if they don't exist
 ALTER TABLE feedback_forms ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
 ALTER TABLE feedback_forms ADD COLUMN IF NOT EXISTS response_count INTEGER DEFAULT 0;
 
@@ -436,7 +407,7 @@ CREATE POLICY "Products are publicly readable" ON products FOR SELECT USING (tru
 
 ALTER TABLE blog_posts ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Published blog posts are publicly readable" ON blog_posts;
-CREATE POLICY "Published blog posts are publicly readable" ON blog_posts FOR SELECT USING (status = 'published');
+CREATE POLICY "Published blog posts are publicly readable" ON blog_posts FOR SELECT USING (is_published = true);
 
 ALTER TABLE client_levels ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Client levels are publicly readable" ON client_levels;

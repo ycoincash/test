@@ -404,11 +404,8 @@ export interface BlogPost {
     title: string;
     excerpt: string;
     content: string; // Markdown content
-    imageUrl: string;
-    authorName: string;
-    authorId: string;
-    status: 'draft' | 'published';
-    tags: string[];
+    author: string;
+    isPublished: boolean;
     createdAt: Date;
     updatedAt: Date;
 }

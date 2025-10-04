@@ -26,13 +26,13 @@ export const getColumns = (
     cell: ({ row }) => <div className="font-medium">{row.original.title}</div>,
   },
   {
-    accessorKey: "status",
+    accessorKey: "isPublished",
     header: "الحالة",
     cell: ({ row }) => {
-      const status = row.original.status
+      const isPublished = row.original.isPublished
       return (
-        <Badge variant={status === 'published' ? 'default' : 'secondary'}>
-          {status === 'published' ? 'منشور' : 'مسودة'}
+        <Badge variant={isPublished ? 'default' : 'secondary'}>
+          {isPublished ? 'منشور' : 'مسودة'}
         </Badge>
       )
     },

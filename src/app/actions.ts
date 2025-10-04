@@ -1002,7 +1002,7 @@ export async function getPublishedBlogPosts(): Promise<BlogPost[]> {
     const { data, error } = await supabase
         .from('blog_posts')
         .select('*')
-        .eq('status', 'published')
+        .eq('is_published', true)
         .order('created_at', { ascending: false });
 
     if (error) {
@@ -1015,12 +1015,9 @@ export async function getPublishedBlogPosts(): Promise<BlogPost[]> {
         title: item.title,
         slug: item.slug,
         content: item.content,
-        excerpt: item.excerpt,
-        imageUrl: item.image_url,
-        authorName: item.author_name,
-        authorId: item.author_id,
-        status: item.status,
-        tags: item.tags || [],
+        excerpt: item.excerpt || '',
+        author: item.author,
+        isPublished: item.is_published,
         createdAt: new Date(item.created_at),
         updatedAt: new Date(item.updated_at),
     }));
@@ -1028,11 +1025,11 @@ export async function getPublishedBlogPosts(): Promise<BlogPost[]> {
 
 export async function getBlogPostBySlug(slug: string): Promise<BlogPost | null> {
     const supabase = await createClient();
-    const { data, error } = await supabase
+    const { data, error} = await supabase
         .from('blog_posts')
         .select('*')
         .eq('slug', slug)
-        .eq('status', 'published')
+        .eq('is_published', true)
         .single();
 
     if (error || !data) {
@@ -1044,12 +1041,9 @@ export async function getBlogPostBySlug(slug: string): Promise<BlogPost | null> 
         title: data.title,
         slug: data.slug,
         content: data.content,
-        excerpt: data.excerpt,
-        imageUrl: data.image_url,
-        authorName: data.author_name,
-        authorId: data.author_id,
-        status: data.status,
-        tags: data.tags || [],
+        excerpt: data.excerpt || '',
+        author: data.author,
+        isPublished: data.is_published,
         createdAt: new Date(data.created_at),
         updatedAt: new Date(data.updated_at),
     };
@@ -1065,11 +1059,8 @@ export async function addBlogPost(data: Omit<BlogPost, 'id' | 'createdAt' | 'upd
                 slug: data.slug,
                 content: data.content,
                 excerpt: data.excerpt,
-                image_url: data.imageUrl,
-                author_name: data.authorName,
-                author_id: data.authorId,
-                status: data.status,
-                tags: data.tags,
+                author: data.author,
+                is_published: data.isPublished,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
             });
@@ -1093,11 +1084,8 @@ export async function updateBlogPost(id: string, data: Partial<Omit<BlogPost, 'i
         if (data.slug !== undefined) updateData.slug = data.slug;
         if (data.content !== undefined) updateData.content = data.content;
         if (data.excerpt !== undefined) updateData.excerpt = data.excerpt;
-        if (data.imageUrl !== undefined) updateData.image_url = data.imageUrl;
-        if (data.authorName !== undefined) updateData.author_name = data.authorName;
-        if (data.authorId !== undefined) updateData.author_id = data.authorId;
-        if (data.status !== undefined) updateData.status = data.status;
-        if (data.tags !== undefined) updateData.tags = data.tags;
+        if (data.author !== undefined) updateData.author = data.author;
+        if (data.isPublished !== undefined) updateData.is_published = data.isPublished;
         
         const { error } = await supabase
             .from('blog_posts')

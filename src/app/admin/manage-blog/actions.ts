@@ -8,7 +8,7 @@ export async function getAllBlogPosts(): Promise<BlogPost[]> {
     const { data, error } = await supabase
         .from('blog_posts')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false});
 
     if (error) {
         console.error("Error fetching blog posts:", error);
@@ -20,12 +20,9 @@ export async function getAllBlogPosts(): Promise<BlogPost[]> {
         title: post.title,
         slug: post.slug,
         content: post.content,
-        excerpt: post.excerpt,
-        imageUrl: post.image_url,
-        authorName: post.author_name,
-        authorId: post.author_id,
-        status: post.status as 'draft' | 'published',
-        tags: post.tags || [],
+        excerpt: post.excerpt || '',
+        author: post.author,
+        isPublished: post.is_published,
         createdAt: new Date(post.created_at),
         updatedAt: new Date(post.updated_at),
     })) as BlogPost[];
@@ -43,11 +40,8 @@ export async function addBlogPost(data: Omit<BlogPost, 'id' | 'createdAt' | 'upd
                 slug: data.slug,
                 content: data.content,
                 excerpt: data.excerpt,
-                image_url: data.imageUrl,
-                author_name: data.authorName,
-                author_id: data.authorId,
-                status: data.status,
-                tags: data.tags || [],
+                author: data.author,
+                is_published: data.isPublished,
                 created_at: now,
                 updated_at: now,
             });
@@ -77,11 +71,8 @@ export async function updateBlogPost(id: string, data: Partial<Omit<BlogPost, 'i
         if (data.slug !== undefined) updateData.slug = data.slug;
         if (data.content !== undefined) updateData.content = data.content;
         if (data.excerpt !== undefined) updateData.excerpt = data.excerpt;
-        if (data.imageUrl !== undefined) updateData.image_url = data.imageUrl;
-        if (data.authorName !== undefined) updateData.author_name = data.authorName;
-        if (data.authorId !== undefined) updateData.author_id = data.authorId;
-        if (data.status !== undefined) updateData.status = data.status;
-        if (data.tags !== undefined) updateData.tags = data.tags;
+        if (data.author !== undefined) updateData.author = data.author;
+        if (data.isPublished !== undefined) updateData.is_published = data.isPublished;
 
         const { error } = await supabase
             .from('blog_posts')
