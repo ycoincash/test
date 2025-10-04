@@ -902,7 +902,7 @@ export async function getEnabledOffers() {
     const { data, error } = await supabase
         .from('offers')
         .select('*')
-        .eq('is_enabled', true);
+        .eq('is_active', true);
     
     if (error) {
         console.error("Error fetching offers:", error);
