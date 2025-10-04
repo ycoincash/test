@@ -9,6 +9,7 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
+import { useAutosave } from "@/hooks/use-autosave";
 import type { Broker } from "@/types";
 import { addBroker, updateBroker } from "@/app/admin/manage-brokers/actions";
 import { createClient } from "@/lib/supabase/client";
@@ -357,6 +358,27 @@ export default function BrokerFormPage() {
       fetchBroker();
     }
   }, [brokerId, isNew, form]);
+
+  const handleAutosave = async (data: BrokerFormValues) => {
+    if (!isNew) {
+      try {
+        const key = `broker_draft_${brokerId}`;
+        localStorage.setItem(key, JSON.stringify({
+          data,
+          savedAt: new Date().toISOString(),
+        }));
+      } catch (error) {
+        console.error("Failed to save draft:", error);
+      }
+    }
+  };
+
+  useAutosave({
+    form,
+    onSave: handleAutosave,
+    enabled: !isNew && !isLoading,
+    debounceMs: 3000,
+  });
 
   const handleSubmit = async (values: BrokerFormValues) => {
     setIsSubmitting(true);
