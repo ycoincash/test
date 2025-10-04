@@ -53,6 +53,132 @@ function transformBrokerFromDB(dbBroker: any): Broker {
   };
 }
 
+function transformFormToBroker(formValues: BrokerFormValues): any {
+  return {
+    logoUrl: formValues.logoUrl,
+    category: formValues.category,
+    description: formValues.description,
+    name: formValues.basicInfo.broker_name,
+    rating: Math.round(formValues.reputation.wikifx_score ? formValues.reputation.wikifx_score / 2 : 0),
+    
+    basicInfo: {
+      broker_name: formValues.basicInfo.broker_name,
+      year_founded: formValues.basicInfo.year_founded || formValues.basicInfo.founded_year,
+      headquarters: formValues.basicInfo.headquarters,
+      website: formValues.basicInfo.website,
+      company_name: formValues.basicInfo.company_name,
+      group_entity: formValues.basicInfo.group_entity,
+      founded_year: formValues.basicInfo.founded_year,
+      CEO: formValues.basicInfo.CEO,
+      broker_type: formValues.basicInfo.broker_type,
+    },
+    
+    regulation: {
+      is_regulated: formValues.regulation.is_regulated,
+      licenses: formValues.regulation.licenses,
+      regulatory_bodies: formValues.regulation.regulatory_bodies,
+      investor_protection: formValues.regulation.investor_protection,
+      regulation_status: formValues.regulation.regulation_status,
+      offshore_regulation: formValues.regulation.offshore_regulation,
+      risk_level: formValues.regulation.risk_level,
+      regulated_in: formValues.regulation.regulated_in,
+      regulator_name: formValues.regulation.regulator_name,
+    },
+    
+    tradingConditions: {
+      minimum_deposit: formValues.tradingConditions.minimum_deposit || formValues.tradingConditions.min_deposit,
+      maximum_leverage: formValues.tradingConditions.maximum_leverage || formValues.tradingConditions.max_leverage,
+      spreads_from: formValues.tradingConditions.spreads_from || formValues.tradingConditions.min_spread,
+      commission: formValues.tradingConditions.commission,
+      account_types: formValues.tradingConditions.account_types,
+      execution_type: formValues.tradingConditions.execution_type,
+      base_currency: formValues.tradingConditions.base_currency,
+      max_leverage: formValues.tradingConditions.max_leverage,
+      min_deposit: formValues.tradingConditions.min_deposit,
+      spread_type: formValues.tradingConditions.spread_type,
+      min_spread: formValues.tradingConditions.min_spread,
+      commission_per_lot: formValues.tradingConditions.commission_per_lot,
+      execution_speed: formValues.tradingConditions.execution_speed,
+    },
+    
+    platforms: {
+      trading_platforms: formValues.platforms.trading_platforms,
+      mobile_trading: formValues.platforms.mobile_trading,
+      demo_account: formValues.platforms.demo_account,
+      copy_trading: formValues.platforms.copy_trading,
+      platforms_supported: formValues.platforms.platforms_supported,
+      mt4_license_type: formValues.platforms.mt4_license_type,
+      mt5_license_type: formValues.platforms.mt5_license_type,
+      custom_platform: formValues.platforms.custom_platform,
+    },
+    
+    instruments: {
+      forex_pairs: formValues.instruments.forex_pairs,
+      crypto_trading: formValues.instruments.crypto_trading,
+      stocks: formValues.instruments.stocks,
+      commodities: formValues.instruments.commodities,
+      indices: formValues.instruments.indices,
+    },
+    
+    depositsWithdrawals: {
+      payment_methods: formValues.depositsWithdrawals.payment_methods,
+      min_withdrawal: formValues.depositsWithdrawals.min_withdrawal,
+      withdrawal_speed: formValues.depositsWithdrawals.withdrawal_speed,
+      deposit_fees: formValues.depositsWithdrawals.deposit_fees,
+      withdrawal_fees: formValues.depositsWithdrawals.withdrawal_fees,
+    },
+    
+    cashback: {
+      offers_cashback: formValues.cashback.offers_cashback,
+      cashback_amount: formValues.cashback.cashback_amount,
+      cashback_currency: formValues.cashback.cashback_currency,
+      cashback_frequency: formValues.cashback.cashback_frequency,
+      minimum_withdrawal: formValues.cashback.minimum_withdrawal,
+      eligible_instruments: formValues.cashback.eligible_instruments,
+      terms_and_conditions: formValues.cashback.terms_and_conditions,
+      affiliate_program_link: formValues.cashback.affiliate_program_link,
+      cashback_account_type: formValues.cashback.cashback_account_type,
+      rebate_method: formValues.cashback.rebate_method,
+      cashback_per_lot: formValues.cashback.cashback_per_lot,
+    },
+    
+    globalReach: {
+      business_region: formValues.globalReach.business_region,
+      global_presence: formValues.globalReach.global_presence,
+      languages_supported: formValues.globalReach.languages_supported,
+      customer_support_channels: formValues.globalReach.customer_support_channels,
+    },
+    
+    reputation: {
+      wikifx_score: formValues.reputation.wikifx_score,
+      trustpilot_rating: formValues.reputation.trustpilot_rating,
+      reviews_count: formValues.reputation.reviews_count,
+      verified_users: formValues.reputation.verified_users,
+    },
+    
+    additionalFeatures: {
+      swap_free: formValues.additionalFeatures.swap_free,
+      education_center: formValues.additionalFeatures.education_center,
+      copy_trading: formValues.additionalFeatures.copy_trading,
+      demo_account: formValues.additionalFeatures.demo_account,
+      trading_contests: formValues.additionalFeatures.trading_contests,
+      regulatory_alerts: formValues.additionalFeatures.regulatory_alerts,
+      welcome_bonus: formValues.additionalFeatures.welcome_bonus,
+    },
+    
+    instructions: {
+      description: formValues.instructions.description,
+      new_account_instructions: formValues.instructions.new_account_instructions,
+      new_account_link: formValues.instructions.new_account_link,
+      new_account_link_text: formValues.instructions.new_account_link_text,
+      linkText: formValues.instructions.new_account_link_text,
+      link: formValues.instructions.new_account_link,
+    },
+    
+    existingAccountInstructions: formValues.existingAccountInstructions,
+  };
+}
+
 const licenseSchema = z.object({
   authority: z.string().min(1, "جهة الترخيص مطلوبة"),
   licenseNumber: z.string().optional(),
@@ -383,17 +509,7 @@ export default function BrokerFormPage() {
   const handleSubmit = async (values: BrokerFormValues) => {
     setIsSubmitting(true);
     try {
-      const legacyData = {
-        name: values.basicInfo.broker_name,
-        description: values.description,
-        rating: Math.round(values.reputation.wikifx_score ? values.reputation.wikifx_score / 2 : 0),
-        instructions: {
-          description: values.instructions.description,
-          linkText: values.instructions.new_account_link_text,
-          link: values.instructions.new_account_link,
-        }
-      };
-      const payload = { ...values, ...legacyData };
+      const payload = transformFormToBroker(values);
 
       let result;
       if (isNew) {
@@ -407,6 +523,12 @@ export default function BrokerFormPage() {
           title: isNew ? "Broker added successfully" : "Broker updated successfully",
           description: isNew ? "تمت إضافة الوسيط بنجاح" : "تم تحديث الوسيط بنجاح",
         });
+        
+        if (!isNew) {
+          const key = `broker_draft_${brokerId}`;
+          localStorage.removeItem(key);
+        }
+        
         router.push('/admin/manage-brokers');
       } else {
         toast({
